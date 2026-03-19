@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/user.dart';
 import '../viewmodels/auth_viewmodel.dart';
+import 'otp_verification_view.dart'; // Import the new OTP screen
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -124,7 +125,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     final user = User(
-      id: 0,
+      id: '',
       fullName: _fullNameController.text.trim(),
       address: _addressController.text.trim(),
       age: int.parse(_ageController.text.trim()),
@@ -151,38 +152,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     if (success && mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Icon(Icons.check_circle, color: Colors.green, size: 60),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Account Created!',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Your account has been successfully created. Please login to continue.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).pop(); // Go back to login
-              },
-              child: const Text('OK'),
-            ),
-          ],
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OtpVerificationScreen(email: _emailController.text.trim().toLowerCase()),
         ),
       );
     }

@@ -12,7 +12,7 @@ class Contribution {
 
   final int id;
   final int groupId;
-  final int userId;
+  final String userId;
   final double amount;
   final int round;
   final String status; // 'pending', 'paid', 'late'
@@ -36,8 +36,8 @@ class Contribution {
     return Contribution(
       id: map['id'] as int,
       groupId: map['group_id'] as int,
-      userId: map['user_id'] as int,
-      amount: map['amount'] as double,
+      userId: map['user_id'].toString(),
+      amount: (map['amount'] as num).toDouble(),
       round: map['round'] as int,
       status: map['status'] as String,
       dueDate: DateTime.parse(map['due_date'] as String),

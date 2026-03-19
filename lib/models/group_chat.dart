@@ -10,7 +10,7 @@ class GroupChat {
 
   final int id;
   final int groupId;
-  final int userId;
+  final String userId;
   final String userName;
   final String message;
   final DateTime timestamp;
@@ -30,7 +30,7 @@ class GroupChat {
     return GroupChat(
       id: map['id'] as int,
       groupId: map['group_id'] as int,
-      userId: map['user_id'] as int,
+      userId: map['user_id'].toString(),
       userName: map['user_name'] as String,
       message: map['message'] as String,
       timestamp: DateTime.parse(map['timestamp'] as String),

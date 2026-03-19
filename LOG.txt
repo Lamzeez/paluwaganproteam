@@ -1,0 +1,101 @@
+I/gralloc4(13813): register: id=2610000a100
+
+══╡ EXCEPTION CAUGHT BY FOUNDATION LIBRARY ╞════════════════════════════════════════════════════════
+The following assertion was thrown while dispatching notifications for GroupsViewModel:
+setState() or markNeedsBuild() called during build.
+This _InheritedProviderScope<GroupsViewModel?> widget cannot be marked as needing to build because
+the framework is already in the process of building widgets. A widget can be marked as needing to be
+built during the build phase only if one of its ancestors is currently building. This exception is
+allowed because the framework builds parent widgets before children, which means a dirty descendant
+will always be built. Otherwise, the framework might not visit this widget during this build phase.
+The widget on which setState() or markNeedsBuild() was called was:
+  _InheritedProviderScope<GroupsViewModel?>
+The widget which was currently being built when the offending call was made was:
+  Builder
+
+When the exception was thrown, this was the stack:
+#0      Element.markNeedsBuild.<anonymous closure> (package:flutter/src/widgets/framework.dart:5376:9)
+#1      Element.markNeedsBuild (package:flutter/src/widgets/framework.dart:5388:6)
+#2      _InheritedProviderScopeElement.markNeedsNotifyDependents (package:provider/src/inherited_provider.dart:590:5)
+#3      ChangeNotifier.notifyListeners (package:flutter/src/foundation/change_notifier.dart:435:24)
+#4      GroupsViewModel._setLoading (package:paluwagan_pro/viewmodels/groups_viewmodel.dart:48:5)
+#5      GroupsViewModel.loadUserGroups (package:paluwagan_pro/viewmodels/groups_viewmodel.dart:59:5)
+#6      _DashboardScreenState._loadUserGroups (package:paluwagan_pro/views/home_view.dart:41:22)
+#7      _DashboardScreenState.initState (package:paluwagan_pro/views/home_view.dart:33:5)
+#8      StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5953:55)
+#9      ComponentElement.mount (package:flutter/src/widgets/framework.dart:5796:5)
+...     Normal element mounting (260 frames)
+#269    Element.inflateWidget (package:flutter/src/widgets/framework.dart:4590:20)
+#270    MultiChildRenderObjectElement.inflateWidget (package:flutter/src/widgets/framework.dart:7269:36)
+#271    Element.updateChild (package:flutter/src/widgets/framework.dart:4059:18)
+#272    Element.updateChildren (package:flutter/src/widgets/framework.dart:4258:32)
+#273    MultiChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7302:17)
+#274    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#275    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#276    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5985:11)
+#277    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#278    StatefulElement.update (package:flutter/src/widgets/framework.dart:6010:5)
+#279    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#280    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#281    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#282    ProxyElement.update (package:flutter/src/widgets/framework.dart:6152:5)
+#283    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#284    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#285    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#286    ProxyElement.update (package:flutter/src/widgets/framework.dart:6152:5)
+#287    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#288    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#289    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#290    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5985:11)
+#291    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#292    StatefulElement.update (package:flutter/src/widgets/framework.dart:6010:5)
+#293    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#294    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#295    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#296    ProxyElement.update (package:flutter/src/widgets/framework.dart:6152:5)
+#297    _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#298    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#299    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#300    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5985:11)
+#301    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#302    StatefulElement.update (package:flutter/src/widgets/framework.dart:6010:5)
+#303    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#304    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#305    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5985:11)
+#306    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#307    StatefulElement.update (package:flutter/src/widgets/framework.dart:6010:5)
+#308    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#309    SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7125:14)
+#310    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#311    SingleChildRenderObjectElement.update (package:flutter/src/widgets/framework.dart:7125:14)
+#312    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#313    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#314    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#315    ProxyElement.update (package:flutter/src/widgets/framework.dart:6152:5)
+#316    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#317    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#318    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#319    ProxyElement.update (package:flutter/src/widgets/framework.dart:6152:5)
+#320    Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#321    ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)
+#322    StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5985:11)
+#323    Element.rebuild (package:flutter/src/widgets/framework.dart:5532:7)
+#324    BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#325    BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#326    BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#327    WidgetsBinding.drawFrame (package:flutter/src/widgets/binding.dart:1262:21)
+#328    RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:495:5)
+#329    SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1434:15)
+#330    SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1347:9)
+#331    SchedulerBinding._handleDrawFrame (package:flutter/src/scheduler/binding.dart:1200:5)
+#332    _invoke (dart:ui/hooks.dart:356:13)
+#333    PlatformDispatcher._drawFrame (dart:ui/platform_dispatcher.dart:444:5)
+#334    _drawFrame (dart:ui/hooks.dart:328:31)
+
+The GroupsViewModel sending notification was:
+  Instance of 'GroupsViewModel'
+════════════════════════════════════════════════════════════════════════════════════════════════════
+
+Another exception was thrown: setState() or markNeedsBuild() called during build.
+I/flutter (13813): Error loading groups: PostgrestException(message: "failed to parse logic tree ((created_by.eq.c672d471-5192-489e-b4a2-0fa77bc503d0, group_members.user_id.eq.c672d471-5192-489e-b4a2-0fa77bc503d0))" (line 1, column 70), code: PGRST100, details: unexpected "u" expecting "not" or operator (eq, gt, ...), hint: null)
+I/flutter (13813): Error loading groups: PostgrestException(message: "failed to parse logic tree ((created_by.eq.c672d471-5192-489e-b4a2-0fa77bc503d0, group_members.user_id.eq.c672d471-5192-489e-b4a2-0fa77bc503d0))" (line 1, column 70), code: PGRST100, details: unexpected "u" expecting "not" or operator (eq, gt, ...), hint: null)

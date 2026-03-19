@@ -17,7 +17,7 @@ class User {
     this.createdAt,
   });
 
-  final int id;
+  final String id;
   final String fullName;
   final String address;
   final int age;
@@ -55,14 +55,14 @@ class User {
 
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
-      id: map['id'] as int,
-      fullName: map['full_name'] as String,
-      address: map['address'] as String,
-      age: map['age'] as int,
-      email: map['email'] as String,
-      password: map['password'] as String,
-      idFrontPath: map['id_front_path'] as String,
-      idBackPath: map['id_back_path'] as String,
+      id: map['id']?.toString() ?? '',
+      fullName: map['full_name'] as String? ?? 'Anonymous',
+      address: map['address'] as String? ?? '',
+      age: (map['age'] as num?)?.toInt() ?? 0,
+      email: map['email'] as String? ?? '',
+      password: map['password'] as String? ?? '', // Often null from Supabase for security
+      idFrontPath: map['id_front_path'] as String? ?? '',
+      idBackPath: map['id_back_path'] as String? ?? '',
       profilePicture: map['profile_picture'] as String?,
       bio: map['bio'] as String?,
       phoneNumber: map['phone_number'] as String?,

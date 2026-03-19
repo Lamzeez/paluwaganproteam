@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'config/supabase_config.dart';
 
 import 'services/db_service.dart';
+import 'services/supabase_service.dart';
 import 'viewmodels/auth_viewmodel.dart';
 import 'viewmodels/groups_viewmodel.dart';
 import 'viewmodels/notification_viewmodel.dart';
@@ -18,6 +21,12 @@ import 'views/join_group_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
+
   await DbService.instance.database;
   runApp(const PaluwaganProApp());
 }
@@ -27,13 +36,15 @@ class PaluwaganProApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final supabaseService = SupabaseService();
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => AuthViewModel(DbService.instance),
+          create: (_) => AuthViewModel(DbService.instance, supabaseService),
         ),
         ChangeNotifierProvider(
-          create: (_) => GroupsViewModel(DbService.instance),
+          create: (_) => GroupsViewModel(DbService.instance, supabaseService),
         ),
         ChangeNotifierProvider(
           create: (_) => NotificationViewModel(DbService.instance),

@@ -30,7 +30,7 @@ class NotificationViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _loadNotifications({int? userId}) async {
+  Future<void> _loadNotifications({String? userId}) async {
     _setLoading(true);
     try {
       final db = await _dbService.database;
@@ -62,7 +62,7 @@ class NotificationViewModel extends ChangeNotifier {
   }
 
   Future<bool> addNotification({
-    required int userId,
+    required String userId,
     required String title,
     required String message,
     required String type,
@@ -150,7 +150,7 @@ class NotificationViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> loadUserNotifications(int userId) async {
+  Future<void> loadUserNotifications(String userId) async {
     await _loadNotifications(userId: userId);
   }
 }

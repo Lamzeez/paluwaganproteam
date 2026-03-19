@@ -23,9 +23,9 @@ class PaymentProof {
   final int id;
   final int contributionId;
   final int groupId;
-  final int senderId;
+  final String senderId;
   final String senderName;
-  final int recipientId;
+  final String recipientId;
   final String recipientName;
   final int round;
   final String gcashName;
@@ -36,7 +36,7 @@ class PaymentProof {
   final String status;
   final DateTime submittedAt;
   final DateTime? verifiedAt;
-  final int? verifiedById;
+  final String? verifiedById;
   final String? rejectionReason;
 
   Map<String, dynamic> toMap() {
@@ -67,22 +67,22 @@ class PaymentProof {
       id: map['id'] as int,
       contributionId: map['contribution_id'] as int,
       groupId: map['group_id'] as int,
-      senderId: map['sender_id'] as int,
+      senderId: map['sender_id'].toString(),
       senderName: map['sender_name'] as String,
-      recipientId: map['recipient_id'] as int,
+      recipientId: map['recipient_id'].toString(),
       recipientName: map['recipient_name'] as String,
       round: map['round'] as int,
       gcashName: map['gcash_name'] as String,
       gcashNumber: map['gcash_number'] as String,
       transactionNo: map['transaction_no'] as String,
       screenshotPath: map['screenshot_path'] as String,
-      amount: map['amount'] as double,
+      amount: (map['amount'] as num).toDouble(),
       status: map['status'] as String,
       submittedAt: DateTime.parse(map['submitted_at'] as String),
       verifiedAt: map['verified_at'] != null
           ? DateTime.parse(map['verified_at'] as String)
           : null,
-      verifiedById: map['verified_by_id'] as int?,
+      verifiedById: map['verified_by_id']?.toString(),
       rejectionReason: map['rejection_reason'] as String?,
     );
   }

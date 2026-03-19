@@ -1,21 +1,45 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../services/db_service.dart';
+import '../services/supabase_service.dart';
 import '../models/user.dart';
 
 class AuthViewModel extends ChangeNotifier {
-  AuthViewModel(this._dbService);
+  AuthViewModel(this._dbService, this._supabaseService);
 
   final DbService _dbService;
+  final SupabaseService _supabaseService;
 
   User? _currentUser;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _isWaitingForEmailVerification = false;
+
+  static String? validateStrongPassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+    if (value.length < 8) {
+      return 'Password must be at least 8 characters long';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!RegExp(r'[0-9]').hasMatch(value)) {
+      return 'Password must contain at least one number';
+    }
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) {
+      return 'Password must contain at least one special character';
+    }
+    return null;
+  }
 
   User? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get isWaitingForEmailVerification => _isWaitingForEmailVerification;
 
   void _setLoading(bool value) {
     _isLoading = value;
@@ -27,36 +51,34 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  static String? validateStrongPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter a password';
-    }
-    if (value.length < 8) {
-      return 'At least 8 characters';
-    }
-    if (!RegExp(r'[A-Z]').hasMatch(value)) {
-      return 'Include at least one uppercase letter';
-    }
-    if (!RegExp(r'[a-z]').hasMatch(value)) {
-      return 'Include at least one lowercase letter';
-    }
-    if (!RegExp(r'\d').hasMatch(value)) {
-      return 'Include at least one number';
-    }
-    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) {
-      return 'Include at least one special character';
-    }
-    return null;
-  }
-
+  // Registration with Supabase and SQLite Sync
   Future<bool> register(User user) async {
-    final db = await _dbService.database;
-
     _setLoading(true);
     _setError(null);
 
     try {
-      final id = await db.insert('users', {
+      // 1. Sign up with Supabase
+      final response = await _supabaseService.signUp(
+        email: user.email,
+        password: user.password,
+        metadata: {
+          'full_name': user.fullName,
+          'address': user.address,
+          'age': user.age,
+        },
+      );
+
+      if (response.user == null) {
+        _setError('Registration failed');
+        return false;
+      }
+
+      final cloudId = response.user!.id;
+
+      // 2. Save to local SQLite for offline support
+      final db = await _dbService.database;
+      await db.insert('users', {
+        'id': cloudId,
         'full_name': user.fullName,
         'address': user.address,
         'age': user.age,
@@ -68,34 +90,11 @@ class AuthViewModel extends ChangeNotifier {
         'gcash_number': user.gcashNumber,
         'urcode_path': user.urcodePath,
         'created_at': DateTime.now().toIso8601String(),
-      }, conflictAlgorithm: ConflictAlgorithm.abort);
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-      // Set current user after registration
-      _currentUser = User(
-        id: id,
-        fullName: user.fullName,
-        address: user.address,
-        age: user.age,
-        email: user.email,
-        password: user.password,
-        idFrontPath: user.idFrontPath,
-        idBackPath: user.idBackPath,
-        gcashName: user.gcashName,
-        gcashNumber: user.gcashNumber,
-        urcodePath: user.urcodePath,
-        createdAt: DateTime.now(),
-      );
-
+      _isWaitingForEmailVerification = true;
       notifyListeners();
       return true;
-    } on DatabaseException catch (e) {
-      print('Database error during registration: $e');
-      if (e.isUniqueConstraintError()) {
-        _setError('Email is already registered.');
-      } else {
-        _setError('Database error: ${e.toString()}');
-      }
-      return false;
     } catch (e) {
       print('Error during registration: $e');
       _setError('Registration failed: $e');
@@ -105,40 +104,101 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
-    final db = await _dbService.database;
-
+  Future<bool> verifyEmailOTP(String email, String token) async {
     _setLoading(true);
     _setError(null);
 
     try {
-      final rows = await db.query(
-        'users',
-        where: 'email = ? AND password = ?',
-        whereArgs: [email.toLowerCase(), password],
-        limit: 1,
+      final response = await _supabaseService.verifyOTP(
+        email: email,
+        token: token,
+        type: supabase.OtpType.signup,
       );
 
-      if (rows.isEmpty) {
-        _setError('Invalid email or password.');
-        _currentUser = null;
-        return false;
+      if (response.user != null) {
+        // Verification successful, fetch profile and set currentUser
+        final cloudId = response.user!.id;
+        final cloudUser = await _supabaseService.getCloudProfile(cloudId);
+        
+        if (cloudUser != null) {
+          _currentUser = cloudUser;
+        } else {
+          // Fallback to local if profile table is still syncing
+          final db = await _dbService.database;
+          final rows = await db.query('users', where: 'id = ?', whereArgs: [cloudId]);
+          if (rows.isNotEmpty) {
+            _currentUser = User.fromMap(rows.first);
+          }
+        }
+        
+        _isWaitingForEmailVerification = false;
+        notifyListeners();
+        return true;
       }
-
-      final row = rows.first;
-      _currentUser = User.fromMap(row);
-      notifyListeners();
-      return true;
-    } catch (_) {
-      _setError('Failed to login.');
-      _currentUser = null;
+      return false;
+    } catch (e) {
+      _setError('Verification failed: $e');
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  void logout() {
+  // Login with Supabase and Sync to Local
+  Future<bool> login(String email, String password) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      // 1. Sign in with Supabase
+      final response = await _supabaseService.signIn(
+        email: email,
+        password: password,
+      );
+
+      if (response.user == null) {
+        _setError('Invalid email or password');
+        return false;
+      }
+
+      final cloudId = response.user!.id;
+
+      // 2. Fetch full profile from cloud
+      final cloudUser = await _supabaseService.getCloudProfile(cloudId);
+      
+      if (cloudUser != null) {
+        _currentUser = cloudUser;
+        
+        // 3. Sync to local SQLite
+        final db = await _dbService.database;
+        await db.insert('users', {
+          ...cloudUser.toMap(),
+          'password': password, // Store password locally for offline login fallback
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      } else {
+        // Fallback to local if profile table missing (shouldn't happen)
+        final db = await _dbService.database;
+        final rows = await db.query('users', where: 'id = ?', whereArgs: [cloudId]);
+        if (rows.isNotEmpty) {
+          _currentUser = User.fromMap(rows.first);
+        }
+      }
+
+      notifyListeners();
+      return true;
+    } on supabase.AuthException catch (e) {
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      _setError('Login failed');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  void logout() async {
+    await _supabaseService.signOut();
     _currentUser = null;
     notifyListeners();
   }

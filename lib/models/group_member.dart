@@ -12,7 +12,7 @@ class GroupMember {
 
   final int id;
   final int groupId;
-  final int userId;
+  final String userId;
   final String userName;
   final DateTime joinedAt;
   final int paidContributions;
@@ -36,7 +36,7 @@ class GroupMember {
     return GroupMember(
       id: map['id'] as int,
       groupId: map['group_id'] as int,
-      userId: map['user_id'] as int,
+      userId: map['user_id'].toString(),
       userName: map['user_name'] as String,
       joinedAt: DateTime.parse(map['joined_at'] as String),
       paidContributions: map['paid_contributions'] as int,

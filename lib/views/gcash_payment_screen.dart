@@ -23,7 +23,7 @@ class GcashPaymentScreen extends StatefulWidget {
   final PaluwaganGroup group;
   final Contribution contribution;
   final int round;
-  final int recipientId;
+  final String recipientId;
   final String recipientName;
   final double amount;
 
@@ -62,10 +62,9 @@ class _GcashPaymentScreenState extends State<GcashPaymentScreen> {
       final user = await groupsVm.getUserById(widget.recipientId);
 
       setState(() {
-        recipientGcashName =
-            user?['full_name'] as String? ?? widget.recipientName;
-        recipientGcashNumber = user?['gcash_number'] as String? ?? '';
-        recipientQrPath = user?['urcode_path'] as String? ?? '';
+        recipientGcashName = user?.fullName ?? widget.recipientName;
+        recipientGcashNumber = user?.gcashNumber ?? '';
+        recipientQrPath = user?.urcodePath ?? '';
       });
     } catch (e) {
       print('Error loading recipient info: $e');

@@ -30,7 +30,7 @@ class _VerifyPaymentScreenState extends State<VerifyPaymentScreen> {
 
     final groupsVm = context.read<GroupsViewModel>();
     final success = await groupsVm.verifyPayment(
-      widget.paymentProof.id,
+      widget.paymentProof,
       context.read<AuthViewModel>().currentUser!.id,
     );
 
@@ -97,7 +97,7 @@ class _VerifyPaymentScreenState extends State<VerifyPaymentScreen> {
 
               final groupsVm = context.read<GroupsViewModel>();
               final success = await groupsVm.rejectPayment(
-                widget.paymentProof.id,
+                widget.paymentProof,
                 reasonController.text.trim(),
               );
 

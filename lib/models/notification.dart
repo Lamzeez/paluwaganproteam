@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Notification {
   Notification({
     required this.id,
@@ -12,7 +14,7 @@ class Notification {
   });
 
   final int id;
-  final int userId;
+  final String userId;
   final String title;
   final String message;
   final String type;
@@ -31,14 +33,14 @@ class Notification {
       'group_id': groupId,
       'is_read': isRead ? 1 : 0,
       'created_at': createdAt.toIso8601String(),
-      'details': details != null ? mapToJsonString(details!) : null,
+      'details': details != null ? jsonEncode(details) : null,
     };
   }
 
   factory Notification.fromMap(Map<String, dynamic> map) {
     return Notification(
       id: map['id'] as int,
-      userId: map['user_id'] as int,
+      userId: map['user_id'].toString(),
       title: map['title'] as String,
       message: map['message'] as String,
       type: map['type'] as String,
@@ -46,7 +48,7 @@ class Notification {
       isRead: (map['is_read'] as int) == 1,
       createdAt: DateTime.parse(map['created_at'] as String),
       details: map['details'] != null
-          ? jsonStringToMap(map['details'] as String)
+          ? jsonDecode(map['details'] as String) as Map<String, dynamic>
           : null,
     );
   }

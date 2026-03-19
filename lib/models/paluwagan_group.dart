@@ -26,7 +26,7 @@ class PaluwaganGroup {
   final int maxMembers;
   final int currentMembers;
   final DateTime nextPayoutDate;
-  final int createdBy;
+  final String createdBy;
   final String joinCode;
   final String
   status; // 'active', 'completed', 'pending' - for backward compatibility
@@ -59,13 +59,13 @@ class PaluwaganGroup {
       id: map['id'] as int,
       name: map['name'] as String,
       description: map['description'] as String,
-      totalPot: map['total_pot'] as double,
-      contribution: map['contribution'] as double,
+      totalPot: (map['total_pot'] as num).toDouble(),
+      contribution: (map['contribution'] as num).toDouble(),
       frequency: map['frequency'] as String,
       maxMembers: map['max_members'] as int,
       currentMembers: map['current_members'] as int,
       nextPayoutDate: DateTime.parse(map['next_payout_date'] as String),
-      createdBy: map['created_by'] as int,
+      createdBy: map['created_by'].toString(),
       joinCode: map['join_code'] as String,
       status: map['status'] as String,
       currentRound: map['current_round'] as int,

@@ -7,6 +7,7 @@ import '../models/paluwagan_group.dart';
 import '../viewmodels/groups_viewmodel.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../viewmodels/notification_viewmodel.dart';
+import '../services/quote_service.dart';
 import 'group_detail_view.dart';
 import 'profile_view.dart';
 import 'notifications_view.dart';
@@ -29,8 +30,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Load user groups when dashboard initializes
-    _loadUserGroups();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserGroups();
+    });
   }
 
   Future<void> _loadUserGroups() async {
@@ -48,13 +50,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  // Get the title for the current screen
   String _getAppBarTitle() {
     switch (_selectedIndex) {
       case 0:
-        return 'PaluwaganPro'; // Show only on Home
+        return 'PaluwaganPro';
       default:
-        return ''; // Empty on all other screens
+        return '';
     }
   }
 
@@ -72,11 +73,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _getAppBarTitle(),
           style: const TextStyle(
             fontSize: 20,
-            fontWeight: FontWeight.normal, // Changed from bold to normal
+            fontWeight: FontWeight.normal,
             color: Colors.black,
           ),
         ),
-        // Hide the app bar completely if title is empty
         toolbarHeight: _getAppBarTitle().isEmpty ? 0 : kToolbarHeight,
       ),
       body: _getCurrentScreen(),
@@ -136,7 +136,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-// Wrapper widgets for screens that need providers or special handling
 class NotificationsScreenWrapper extends StatelessWidget {
   const NotificationsScreenWrapper({super.key});
 
@@ -145,7 +144,6 @@ class NotificationsScreenWrapper extends StatelessWidget {
     final authVm = context.watch<AuthViewModel>();
     final notifVm = context.watch<NotificationViewModel>();
 
-    // Load notifications if needed
     if (authVm.currentUser != null && notifVm.notifications.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifVm.loadUserNotifications(authVm.currentUser!.id);
@@ -183,7 +181,6 @@ class ProfileScreenWrapper extends StatelessWidget {
   }
 }
 
-// Extracted Home content from original DashboardScreen
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
 
@@ -192,13 +189,25 @@ class HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<HomeContent> {
+  String _quote = "Loading daily motivation...";
+  final _quoteService = QuoteService();
+
   @override
   void initState() {
     super.initState();
-    // Refresh data when home tab is shown
+    _fetchQuote();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshData();
     });
+  }
+
+  Future<void> _fetchQuote() async {
+    final q = await _quoteService.getRandomQuote();
+    if (mounted) {
+      setState(() {
+        _quote = q;
+      });
+    }
   }
 
   Future<void> _refreshData() async {
@@ -219,7 +228,6 @@ class _HomeContentState extends State<HomeContent> {
     final groups = groupsVm.groups;
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Calculate summary stats
     final activeGroups = groups.length;
     final nextPayout = groups.isNotEmpty
         ? groups
@@ -229,14 +237,18 @@ class _HomeContentState extends State<HomeContent> {
 
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: _refreshData,
+        onRefresh: () async {
+          await _fetchQuote();
+          await _refreshData();
+        },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Summary Cards
+              _buildQuoteCard(colorScheme),
+              const SizedBox(height: 16),
               _buildHighlightedSummaryCards(
                 context,
                 activeGroups,
@@ -244,10 +256,7 @@ class _HomeContentState extends State<HomeContent> {
                 nextPayout,
                 colorScheme,
               ),
-
               const SizedBox(height: 24),
-
-              // Groups Section Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -265,7 +274,6 @@ class _HomeContentState extends State<HomeContent> {
                               ),
                             )
                             .then((_) {
-                              // Refresh when returning from all groups
                               _refreshData();
                             });
                       },
@@ -284,10 +292,7 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                 ],
               ),
-
               const SizedBox(height: 12),
-
-              // Groups List - Show only ONE group (most recent)
               if (groups.isEmpty)
                 _buildEmptyGroupsState(colorScheme)
               else if (groupsVm.isLoading)
@@ -299,7 +304,6 @@ class _HomeContentState extends State<HomeContent> {
                       .map((g) => _buildGroupCard(context, g, colorScheme))
                       .toList(),
                 ),
-
               const SizedBox(height: 24),
             ],
           ),
@@ -308,7 +312,54 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  // Highlighted Summary Cards
+  Widget _buildQuoteCard(ColorScheme colorScheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.format_quote, color: colorScheme.primary, size: 24),
+              const SizedBox(width: 8),
+              const Text(
+                'Daily Motivation',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _quote,
+            style: const TextStyle(
+              fontSize: 15,
+              fontStyle: FontStyle.italic,
+              color: Colors.black87,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHighlightedSummaryCards(
     BuildContext context,
     int activeGroups,
@@ -316,7 +367,6 @@ class _HomeContentState extends State<HomeContent> {
     DateTime? nextPayout,
     ColorScheme colorScheme,
   ) {
-    // Find the group with the nearest payout date
     PaluwaganGroup? nearestGroup;
     if (groups.isNotEmpty && nextPayout != null) {
       nearestGroup = groups.firstWhere(
@@ -327,7 +377,6 @@ class _HomeContentState extends State<HomeContent> {
 
     return Column(
       children: [
-        // Active Groups Card
         Container(
           width: double.infinity,
           margin: const EdgeInsets.only(bottom: 12),
@@ -395,8 +444,6 @@ class _HomeContentState extends State<HomeContent> {
             ],
           ),
         ),
-
-        // Next Payment Card
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -549,7 +596,6 @@ class _HomeContentState extends State<HomeContent> {
                 ),
               )
               .then((_) {
-                // Refresh group details when returning
                 _refreshData();
               });
         },
@@ -570,7 +616,6 @@ class _HomeContentState extends State<HomeContent> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Group Name - Larger and prominent
               Text(
                 group.name,
                 style: const TextStyle(
@@ -579,18 +624,13 @@ class _HomeContentState extends State<HomeContent> {
                 ),
               ),
               const SizedBox(height: 4),
-
-              // Description - smaller, grey
               Text(
                 group.description,
                 style: const TextStyle(fontSize: 13, color: Colors.grey),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-
               const SizedBox(height: 12),
-
-              // Status Badge and Round
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -626,20 +666,14 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 8),
-
-              // Progress Bar
               LinearProgressIndicator(
                 value: progress,
                 backgroundColor: Colors.grey.shade200,
                 valueColor: AlwaysStoppedAnimation(colorScheme.primary),
                 minHeight: 6,
               ),
-
               const SizedBox(height: 16),
-
-              // Stats Grid - 2x2 layout
               Row(
                 children: [
                   Expanded(
@@ -673,10 +707,7 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
-
-              // Join Code (if creator)
               if (group.createdBy == authVm.currentUser?.id)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -702,7 +733,6 @@ class _HomeContentState extends State<HomeContent> {
                       const SizedBox(width: 4),
                       GestureDetector(
                         onTap: () {
-                          // Copy to clipboard
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Code copied to clipboard'),
@@ -718,10 +748,7 @@ class _HomeContentState extends State<HomeContent> {
                     ],
                   ),
                 ),
-
               const SizedBox(height: 12),
-
-              // View Details Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -734,7 +761,6 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                         )
                         .then((_) {
-                          // Refresh when returning
                           _refreshData();
                         });
                   },

@@ -12,7 +12,7 @@ class Transaction {
 
   final int id;
   final int groupId;
-  final int userId;
+  final String userId;
   final String type; // 'contribution', 'payout'
   final double amount;
   final int round;
@@ -36,7 +36,7 @@ class Transaction {
     return Transaction(
       id: map['id'] as int,
       groupId: map['group_id'] as int,
-      userId: map['user_id'] as int,
+      userId: map['user_id'].toString(),
       type: map['type'] as String,
       amount: map['amount'] as double,
       round: map['round'] as int,

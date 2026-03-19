@@ -15,7 +15,7 @@ class RoundRotation {
   final int groupId;
   final int round;
   final DateTime payoutDate;
-  final int recipientId;
+  final String recipientId;
   final String recipientName;
   final String status;
   final DateTime? completedAt;
@@ -41,13 +41,13 @@ class RoundRotation {
       groupId: map['group_id'] as int,
       round: map['round'] as int,
       payoutDate: DateTime.parse(map['payout_date'] as String),
-      recipientId: map['recipient_id'] as int,
+      recipientId: map['recipient_id'].toString(),
       recipientName: map['recipient_name'] as String,
       status: map['status'] as String,
       completedAt: map['completed_at'] != null
           ? DateTime.parse(map['completed_at'] as String)
           : null,
-      totalCollected: map['total_collected'] as double?,
+      totalCollected: (map['total_collected'] as num?)?.toDouble(),
     );
   }
 }
