@@ -1002,196 +1002,278 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     final colorScheme = Theme.of(context).colorScheme;
     final currentUser = context.read<AuthViewModel>().currentUser;
     final groupsVm = context.watch<GroupsViewModel>();
-    final currentRoundRecipient = groupsVm.roundRotations.firstWhere(
-      (r) => r.round == group.currentRound && r.status == 'in_progress',
-      orElse: () => RoundRotation(
-        id: 0,
-        groupId: group.id,
-        round: group.currentRound,
-        payoutDate: DateTime.now(),
-        recipientId: '',
-        recipientName: '',
-        status: 'pending',
-      ),
-    );
 
-    // Sort members so the creator is always at the top
-    final sortedMembers = List<GroupMember>.from(members);
-    sortedMembers.sort((a, b) {
-      if (a.userId == group.createdBy) return -1;
-      if (b.userId == group.createdBy) return 1;
-      return 0;
-    });
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: groupsVm.streamRotations(group.id),
+      builder: (context, rotationSnapshot) {
+        final rotations = rotationSnapshot.data?.map((r) => RoundRotation.fromMap(r)).toList() 
+            ?? groupsVm.roundRotations;
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: sortedMembers.length,
-      itemBuilder: (context, index) {
-        final member = sortedMembers[index];
-        final isCurrentUser = member.userId == currentUser?.id;
-        final isCreator = member.userId == group.createdBy;
-        final isPayoutRound =
-            member.userId == currentRoundRecipient.recipientId &&
-            group.groupStatus == 'active';
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: groupsVm.streamContributions(group.id),
+          builder: (context, contributionSnapshot) {
+            final contributions = contributionSnapshot.data?.map((c) => Contribution.fromMap(c)).toList() 
+                ?? groupsVm.currentGroupContributions;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isPayoutRound ? colorScheme.primary : Colors.grey.shade200,
-              width: isPayoutRound ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: isCurrentUser
-                    ? colorScheme.primary
-                    : isCreator 
-                        ? Colors.orange.shade100 
-                        : Colors.grey.shade300,
-                child: Text(
-                  member.userName[0].toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isCurrentUser ? Colors.white : Colors.black,
-                    fontWeight: FontWeight.bold,
-                  ),
+            // Sort members so the creator is always at the top
+            final sortedMembers = List<GroupMember>.from(members);
+            sortedMembers.sort((a, b) {
+              if (a.userId == group.createdBy) return -1;
+              if (b.userId == group.createdBy) return 1;
+              return 0;
+            });
+
+            final currentRoundRecipient = rotations.firstWhere(
+              (r) => r.status == 'in_progress',
+              orElse: () => rotations.firstWhere(
+                (r) => r.round == group.currentRound,
+                orElse: () => rotations.isNotEmpty ? rotations.last : RoundRotation(
+                  id: 0,
+                  groupId: group.id,
+                  round: group.currentRound,
+                  payoutDate: DateTime.now(),
+                  recipientId: '',
+                  recipientName: '',
+                  status: 'pending',
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            member.userName,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: isCurrentUser
-                                  ? FontWeight.bold
-                                  : FontWeight.w500,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                        if (isCreator) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade100,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text(
-                              'Creator',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.orange,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (isCurrentUser) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              'You',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (isPayoutRound) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              'Current Payout',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Paid: ${member.paidContributions}  •  Received: ${member.receivedPayouts}',
-                      style: const TextStyle(fontSize: 13, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-              // REMOVE / LEAVE BUTTONS (Only if group not started)
-              if (group.groupStatus == 'pending') ...[
-                if (group.createdBy == currentUser?.id && !isCurrentUser)
-                  IconButton(
-                    icon: const Icon(Icons.person_remove_outlined, color: Colors.red, size: 20),
-                    onPressed: () async {
-                      final confirmed = await _showConfirmDialog(
-                        context,
-                        'Remove Member',
-                        'Are you sure you want to remove ${member.userName} from the group?',
-                      );
-                      if (confirmed) {
-                        await groupsVm.leaveGroup(group.id, member.userId);
-                      }
-                    },
-                  ),
-                if (isCurrentUser && group.createdBy != currentUser?.id)
-                  TextButton(
-                    onPressed: () async {
-                      final confirmed = await _showConfirmDialog(
-                        context,
-                        'Leave Group',
-                        'Are you sure you want to leave ${group.name}?',
-                      );
-                      if (confirmed) {
-                        final success = await groupsVm.leaveGroup(group.id, currentUser!.id);
-                        if (success && mounted) {
-                          Navigator.of(context).pop(); // Go back home
+            );
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: sortedMembers.length,
+              itemBuilder: (context, index) {
+                final member = sortedMembers[index];
+                final isCurrentUser = member.userId == currentUser?.id;
+                final isCreator = member.userId == group.createdBy;
+                final isPayoutRound =
+                    member.userId == currentRoundRecipient.recipientId &&
+                    group.groupStatus == 'active';
+
+                // DYNAMIC STATS CALCULATION
+                final memberContributions = contributions.where((c) => c.userId == member.userId).toList();
+                final paidCount = memberContributions.where((c) => c.status == 'paid').length;
+                final receivedCount = rotations.where((r) => r.recipientId == member.userId && r.status == 'completed').length;
+
+                // TRUST SCORE CALCULATION
+                // Logic: (On-time payments / Total payments) * 100
+                // Late is defined as paid_at > due_date
+                double trustScore = 100.0;
+                int totalEvaluated = 0;
+                int onTimeCount = 0;
+
+                for (var c in memberContributions) {
+                  if (c.status == 'paid') {
+                    // Check if it's the recipient slot (auto-paid)
+                    final isRecipientSlot = rotations.any((r) => r.round == c.round && r.recipientId == c.userId);
+                    
+                    if (!isRecipientSlot) {
+                      totalEvaluated++;
+                      if (c.paidAt != null) {
+                        // Allow 1 hour grace period for processing
+                        final isLate = c.paidAt!.isAfter(c.dueDate.add(const Duration(hours: 1)));
+                        if (!isLate) {
+                          onTimeCount++;
                         }
                       }
-                    },
-                    child: const Text('LEAVE', style: TextStyle(color: Colors.red, fontSize: 12)),
+                    }
+                  } else if (c.status == 'pending' && c.dueDate.isBefore(DateTime.now())) {
+                    // Penalty for overdue unpaid contributions
+                    totalEvaluated++;
+                  }
+                }
+
+                if (totalEvaluated > 0) {
+                  trustScore = (onTimeCount / totalEvaluated) * 100;
+                }
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isPayoutRound ? colorScheme.primary : Colors.grey.shade200,
+                      width: isPayoutRound ? 2 : 1,
+                    ),
                   ),
-              ],
-            ],
-          ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: isCurrentUser
+                            ? colorScheme.primary
+                            : isCreator 
+                                ? Colors.orange.shade100 
+                                : Colors.grey.shade300,
+                        child: Text(
+                          member.userName[0].toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: isCurrentUser ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    member.userName,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: isCurrentUser
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                                if (isCreator) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade100,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Text(
+                                      'Creator',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                if (isPayoutRound) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'Current Payout',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Text(
+                                  'Paid: $paidCount  •  Received: $receivedCount',
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                                const Spacer(),
+                                _buildTrustBadge(trustScore, totalEvaluated == 0),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // REMOVE / LEAVE BUTTONS (Only if group not started)
+                      if (group.groupStatus == 'pending') ...[
+                        if (group.createdBy == currentUser?.id && !isCurrentUser)
+                          IconButton(
+                            icon: const Icon(Icons.person_remove_outlined, color: Colors.red, size: 20),
+                            onPressed: () async {
+                              final confirmed = await _showConfirmDialog(
+                                context,
+                                'Remove Member',
+                                'Are you sure you want to remove ${member.userName} from the group?',
+                              );
+                              if (confirmed) {
+                                await groupsVm.leaveGroup(group.id, member.userId);
+                              }
+                            },
+                          ),
+                        if (isCurrentUser && group.createdBy != currentUser?.id)
+                          TextButton(
+                            onPressed: () async {
+                              final confirmed = await _showConfirmDialog(
+                                context,
+                                'Leave Group',
+                                'Are you sure you want to leave ${group.name}?',
+                              );
+                              if (confirmed) {
+                                final success = await groupsVm.leaveGroup(group.id, currentUser!.id);
+                                if (success && mounted) {
+                                  Navigator.of(context).pop(); // Go back home
+                                }
+                              }
+                            },
+                            child: const Text('LEAVE', style: TextStyle(color: Colors.red, fontSize: 12)),
+                          ),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            );
+          }
         );
-      },
+      }
+    );
+  }
+
+  Widget _buildTrustBadge(double score, bool isNew) {
+    if (isNew) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          'NEW',
+          style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    Color badgeColor = Colors.green;
+    if (score < 70) badgeColor = Colors.red;
+    else if (score < 90) badgeColor = Colors.orange;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: badgeColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified_user, size: 10, color: badgeColor),
+          const SizedBox(width: 4),
+          Text(
+            '${score.toStringAsFixed(0)}% Trust',
+            style: TextStyle(fontSize: 10, color: badgeColor, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 
