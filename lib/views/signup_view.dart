@@ -112,7 +112,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     if (_urcodePath == null) {
       setState(() {
-        _errorMessage = 'Please upload your UR Code';
+        _errorMessage = 'Please upload your InstaPay QR Code';
       });
       return;
     }
@@ -395,9 +395,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // UR Code Upload - Label outside, border same as personal info
+                // InstaPay QR Code Upload - Label outside, border same as personal info
                 const Text(
-                  'UR Code *',
+                  'InstaPay QR Code *',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.black,

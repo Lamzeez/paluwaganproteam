@@ -35,7 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _gcashNameController = TextEditingController();
   final TextEditingController _gcashNumberController = TextEditingController();
 
-  // QR Code
+  // InstaPay QR Code
   String? _newQrPath;
   String? _qrFilename;
 
@@ -59,7 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _ageController.text = user.age.toString();
       _gcashNameController.text = user.gcashName ?? '';
       _gcashNumberController.text = user.gcashNumber ?? '';
-      _qrFilename = user.urcodePath != null ? 'Current QR Code' : null;
+      _qrFilename = user.urcodePath != null ? 'Current InstaPay QR Code' : null;
     }
   }
 
@@ -551,12 +551,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 if (_isEditing) ...[
                   const SizedBox(height: 16),
-                  // QR Code Upload
+                  // InstaPay QR Code Upload
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'QR Code',
+                        'InstaPay QR Code',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -597,7 +597,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       )
                                     : Text(
-                                        user.urcodePath != null ? 'Current QR Code' : 'No QR code',
+                                        user.urcodePath != null ? 'Current InstaPay QR Code' : 'No InstaPay QR Code',
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: user.urcodePath != null ? Colors.black87 : Colors.grey,

@@ -245,7 +245,7 @@ class _GcashPaymentScreenState extends State<GcashPaymentScreen> {
                               showDialog(
                                 context: context,
                                 builder: (context) => AlertDialog(
-                                  title: const Text('GCash QR Code'),
+                                  title: const Text('InstaPay QR Code'),
                                   content: Image.file(File(recipientQrPath!)),
                                   actions: [
                                     TextButton(
@@ -259,7 +259,7 @@ class _GcashPaymentScreenState extends State<GcashPaymentScreen> {
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('QR code not available'),
+                                  content: Text('InstaPay QR Code not available'),
                                 ),
                               );
                             }

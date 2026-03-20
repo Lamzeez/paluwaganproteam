@@ -57,7 +57,7 @@ class AuthViewModel extends ChangeNotifier {
     _setError(null);
 
     try {
-      // 1. Sign up with Supabase
+      // 1. Sign up with Supabase Auth
       final response = await _supabaseService.signUp(
         email: user.email,
         password: user.password,
@@ -75,21 +75,61 @@ class AuthViewModel extends ChangeNotifier {
 
       final cloudId = response.user!.id;
 
-      // 2. Save to local SQLite for offline support
-      final db = await _dbService.database;
-      await db.insert('users', {
+      // 2. Upload files to Supabase Storage
+      String idFrontUrl = user.idFrontPath;
+      String idBackUrl = user.idBackPath;
+      String? urcodeUrl = user.urcodePath;
+
+      try {
+        if (user.idFrontPath.isNotEmpty && !user.idFrontPath.startsWith('http')) {
+          idFrontUrl = await _supabaseService.uploadFile(
+            bucket: 'profiles',
+            filePath: user.idFrontPath,
+            remotePath: '$cloudId/id_front_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          );
+        }
+
+        if (user.idBackPath.isNotEmpty && !user.idBackPath.startsWith('http')) {
+          idBackUrl = await _supabaseService.uploadFile(
+            bucket: 'profiles',
+            filePath: user.idBackPath,
+            remotePath: '$cloudId/id_back_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          );
+        }
+
+        if (user.urcodePath != null && user.urcodePath!.isNotEmpty && !user.urcodePath!.startsWith('http')) {
+          urcodeUrl = await _supabaseService.uploadFile(
+            bucket: 'profiles',
+            filePath: user.urcodePath!,
+            remotePath: '$cloudId/urcode_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          );
+        }
+      } catch (e) {
+        print('Warning: File upload failed, continuing with local paths: $e');
+      }
+
+      // 3. Create Cloud Profile in 'profiles' table
+      final profileData = {
         'id': cloudId,
         'full_name': user.fullName,
         'address': user.address,
         'age': user.age,
         'email': user.email.toLowerCase(),
-        'password': user.password,
-        'id_front_path': user.idFrontPath,
-        'id_back_path': user.idBackPath,
+        'id_front_path': idFrontUrl,
+        'id_back_path': idBackUrl,
         'gcash_name': user.gcashName,
         'gcash_number': user.gcashNumber,
-        'urcode_path': user.urcodePath,
+        'urcode_path': urcodeUrl,
         'created_at': DateTime.now().toIso8601String(),
+      };
+
+      await _supabaseService.createCloudProfile(profileData);
+
+      // 4. Save to local SQLite for offline support
+      final db = await _dbService.database;
+      await db.insert('users', {
+        ...profileData,
+        'password': user.password,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
 
       _isWaitingForEmailVerification = true;
