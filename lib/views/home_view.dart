@@ -225,90 +225,97 @@ class _HomeContentState extends State<HomeContent> {
   Widget build(BuildContext context) {
     final groupsVm = context.watch<GroupsViewModel>();
     final authVm = context.watch<AuthViewModel>();
-    final groups = groupsVm.groups;
     final colorScheme = Theme.of(context).colorScheme;
 
-    final activeGroups = groups.length;
-    final nextPayout = groups.isNotEmpty
-        ? groups
-              .map((g) => g.nextPayoutDate)
-              .reduce((a, b) => a.isBefore(b) ? a : b)
-        : null;
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: groupsVm.streamGroups(authVm.currentUser!.id),
+      builder: (context, snapshot) {
+        final groups = snapshot.data?.map((g) => PaluwaganGroup.fromMap(g)).toList() 
+            ?? groupsVm.groups;
 
-    return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: () async {
-          await _fetchQuote();
-          await _refreshData();
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildQuoteCard(colorScheme),
-              const SizedBox(height: 16),
-              _buildHighlightedSummaryCards(
-                context,
-                activeGroups,
-                groups,
-                nextPayout,
-                colorScheme,
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        final activeGroups = groups.length;
+        final nextPayout = groups.isNotEmpty
+            ? groups
+                  .map((g) => g.nextPayoutDate)
+                  .reduce((a, b) => a.isBefore(b) ? a : b)
+            : null;
+
+        return SafeArea(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _fetchQuote();
+              await _refreshData();
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Your Current Group',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  _buildQuoteCard(colorScheme),
+                  const SizedBox(height: 16),
+                  _buildHighlightedSummaryCards(
+                    context,
+                    activeGroups,
+                    groups,
+                    nextPayout,
+                    colorScheme,
                   ),
-                  if (groups.isNotEmpty)
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context)
-                            .push(
-                              MaterialPageRoute(
-                                builder: (_) => AllGroupsPage(groups: groups),
-                              ),
-                            )
-                            .then((_) {
-                              _refreshData();
-                            });
-                      },
-                      style: TextButton.styleFrom(
-                        minimumSize: Size.zero,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Your Current Group',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                       ),
-                      child: const Text(
-                        'View All',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                      if (groups.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context)
+                                .push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const AllGroupsPage(),
+                                  ),
+                                )
+                                .then((_) {
+                                  _refreshData();
+                                });
+                          },
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'View All',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (groups.isEmpty)
+                    _buildEmptyGroupsState(colorScheme)
+                  else if (groupsVm.isLoading && groups.isEmpty)
+                    const Center(child: CircularProgressIndicator())
+                  else
+                    Column(
+                      children: groups
+                          .take(1)
+                          .map((g) => _buildGroupCard(context, g, colorScheme))
+                          .toList(),
                     ),
+                  const SizedBox(height: 24),
                 ],
               ),
-              const SizedBox(height: 12),
-              if (groups.isEmpty)
-                _buildEmptyGroupsState(colorScheme)
-              else if (groupsVm.isLoading)
-                const Center(child: CircularProgressIndicator())
-              else
-                Column(
-                  children: groups
-                      .take(1)
-                      .map((g) => _buildGroupCard(context, g, colorScheme))
-                      .toList(),
-                ),
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 
@@ -368,11 +375,26 @@ class _HomeContentState extends State<HomeContent> {
     ColorScheme colorScheme,
   ) {
     PaluwaganGroup? nearestGroup;
-    if (groups.isNotEmpty && nextPayout != null) {
-      nearestGroup = groups.firstWhere(
-        (g) => g.nextPayoutDate == nextPayout,
-        orElse: () => groups.first,
+    
+    // Only show next payment for groups that have actually started (active status)
+    final startedGroups = groups.where((g) => g.groupStatus == 'active').toList();
+    
+    if (startedGroups.isNotEmpty) {
+      // Find the group with the earliest payout date among started groups
+      final minDate = startedGroups
+          .map((g) => g.nextPayoutDate)
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+          
+      nearestGroup = startedGroups.firstWhere(
+        (g) => g.nextPayoutDate == minDate,
+        orElse: () => startedGroups.first,
       );
+      
+      // Update nextPayout to use the date from started groups
+      nextPayout = minDate;
+    } else {
+      nearestGroup = null;
+      nextPayout = null;
     }
 
     return Column(
@@ -640,17 +662,17 @@ class _HomeContentState extends State<HomeContent> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: group.status == 'active'
+                      color: group.groupStatus == 'active'
                           ? colorScheme.primary.withOpacity(0.08)
                           : Colors.grey.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      group.status,
+                      group.groupStatus == 'active' ? 'Active' : 'Pending',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: group.status == 'active'
+                        color: group.groupStatus == 'active'
                             ? colorScheme.primary
                             : Colors.grey,
                       ),

@@ -93,9 +93,8 @@ class PaluwaganProApp extends StatelessWidget {
             );
           }
           if (settings.name == '/all-groups') {
-            final groups = settings.arguments as List;
             return MaterialPageRoute(
-              builder: (context) => AllGroupsPage(groups: groups.cast()),
+              builder: (context) => const AllGroupsPage(),
             );
           }
           return null;

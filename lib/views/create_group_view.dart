@@ -81,6 +81,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         frequency: _selectedFrequency,
         maxMembers: int.parse(_maxMembersController.text),
         createdBy: authVm.currentUser!.id,
+        createdByName: authVm.currentUser!.fullName,
       );
 
       print('Group creation result - Code: $code'); // DEBUG

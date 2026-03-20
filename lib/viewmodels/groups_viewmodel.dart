@@ -43,6 +43,36 @@ class GroupsViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  // --- REAL-TIME STREAMS ---
+
+  Stream<List<Map<String, dynamic>>> streamGroups(String userId) {
+    return _supabaseService.streamGroups(userId);
+  }
+
+  Stream<Map<String, dynamic>> streamGroup(int groupId) {
+    return _supabaseService.streamGroup(groupId);
+  }
+
+  Stream<List<Map<String, dynamic>>> streamMembers(int groupId) {
+    return _supabaseService.streamMembers(groupId);
+  }
+
+  Stream<List<Map<String, dynamic>>> streamContributions(int groupId) {
+    return _supabaseService.streamContributions(groupId);
+  }
+
+  Stream<List<Map<String, dynamic>>> streamRotations(int groupId) {
+    return _supabaseService.streamRotations(groupId);
+  }
+
+  Stream<List<Map<String, dynamic>>> streamPaymentProofs(int groupId) {
+    return _supabaseService.streamPaymentProofs(groupId);
+  }
+
+  Stream<List<Map<String, dynamic>>> streamChat(int groupId) {
+    return _supabaseService.streamChat(groupId);
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -100,6 +130,7 @@ class GroupsViewModel extends ChangeNotifier {
     required String frequency,
     required int maxMembers,
     required String createdBy,
+    required String createdByName,
   }) async {
     _setLoading(true);
     _setError(null);
@@ -133,6 +164,7 @@ class GroupsViewModel extends ChangeNotifier {
       await _supabaseService.addMember({
         'group_id': groupId,
         'user_id': createdBy,
+        'user_name': createdByName,
         'joined_at': DateTime.now().toIso8601String(),
         'rotation_order': 1,
       });
@@ -181,10 +213,8 @@ class GroupsViewModel extends ChangeNotifier {
         'rotation_order': group.currentMembers + 1,
       });
 
-      // 3. Update member count in Cloud
-      final supabase = _supabaseService; // (Assuming a method or direct client access)
-      // For now we'll assume the trigger on the backend or manual update
-      // await supabase.client.from('groups').update({'current_members': group.currentMembers + 1}).eq('id', group.id);
+      // 3. Update member count in Cloud (also handled by DB trigger if implemented)
+      await _supabaseService.updateGroupMemberCount(group.id, group.currentMembers + 1);
 
       await loadUserGroups(userId);
       return true;
@@ -313,6 +343,62 @@ class GroupsViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteGroup(int groupId) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _supabaseService.deleteGroup(groupId);
+      
+      // Remove from local list
+      _groups.removeWhere((g) => g.id == groupId);
+      if (_currentGroup?.id == groupId) {
+        _currentGroup = null;
+      }
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      print('Error deleting group: $e');
+      _setError('Failed to delete group');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> leaveGroup(int groupId, String userId) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final isSelf = _supabaseService.currentUser?.id == userId;
+
+      // 1. Remove from Cloud
+      await _supabaseService.removeMember(groupId, userId);
+
+      // 2. Update count ONLY if the current user is NOT the one leaving
+      // (because the leaving user loses access to the group immediately)
+      if (!isSelf) {
+        try {
+          final data = await _supabaseService.getGroupDetails(groupId);
+          final members = (data['group_members'] as List);
+          await _supabaseService.updateGroupMemberCount(groupId, members.length);
+        } catch (e) {
+          print('Optional count update skipped: $e');
+        }
+      }
+
+      // 3. Refresh user's group list
+      await loadUserGroups(_supabaseService.currentUser?.id ?? userId);
+      return true;
+    } catch (e) {
+      print('Error leaving group: $e');
+      _setError('Failed to leave group');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<void> sendChatMessage(int groupId, String userId, String userName, String message) async {
     try {
       final messageData = {
@@ -380,16 +466,102 @@ class GroupsViewModel extends ChangeNotifier {
   Future<bool> verifyPayment(PaymentProof proof, String verifiedById) async {
     _setLoading(true);
     try {
+      final group = _currentGroup;
+      if (group == null) return false;
+
       // 1. Update proof in Cloud
       await _supabaseService.verifyPayment(proof.id, verifiedById);
       
       // 2. Update contribution status to 'paid'
       await _supabaseService.updateContributionStatus(proof.contributionId, 'paid');
 
-      // 3. Step 5.2: 20% Fee Logic (Calculation logic here)
-      // For now we just verify. In a real scenario, we might trigger a transaction record.
+      // 3. Step 5.2: 20% Fee Logic
+      final double amount = proof.amount;
+      final double creatorFee = amount * 0.10;
+      final double heldSavings = amount * 0.10;
+      final double recipientNet = amount - creatorFee - heldSavings;
 
+      // Record detailed transactions
+      final List<Map<String, dynamic>> transactions = [
+        {
+          'group_id': proof.groupId,
+          'user_id': proof.senderId,
+          'type': 'contribution',
+          'amount': amount,
+          'round': proof.round,
+          'date': DateTime.now().toIso8601String(),
+          'description': 'Verified contribution from ${proof.senderName} for Round ${proof.round}',
+        },
+        {
+          'group_id': proof.groupId,
+          'user_id': group.createdBy,
+          'type': 'fee_creator',
+          'amount': creatorFee,
+          'round': proof.round,
+          'date': DateTime.now().toIso8601String(),
+          'description': '10% Admin Fee from ${proof.senderName}',
+        },
+        {
+          'group_id': proof.groupId,
+          'user_id': proof.senderId,
+          'type': 'held_savings',
+          'amount': heldSavings,
+          'round': proof.round,
+          'date': DateTime.now().toIso8601String(),
+          'description': '10% Held Savings from ${proof.senderName}',
+        },
+        {
+          'group_id': proof.groupId,
+          'user_id': proof.recipientId,
+          'type': 'payout_portion',
+          'amount': recipientNet,
+          'round': proof.round,
+          'date': DateTime.now().toIso8601String(),
+          'description': 'Net payout portion from ${proof.senderName}',
+        },
+      ];
+
+      await _supabaseService.createTransactions(transactions);
+
+      // Refresh data to check for completion
       await loadGroupDetails(proof.groupId);
+
+      // 4. Cycle Completion Check
+      final allContributions = _currentGroupContributions;
+      final isLastRound = group.currentRound == group.maxMembers;
+      final allPaid = allContributions.every((c) => c.status == 'paid');
+
+      if (allPaid && group.groupStatus == 'active') {
+        // Mark group as completed
+        await _supabaseService.updateGroupStatus(group.id, 'completed');
+
+        // Refund held savings to all verified participants
+        // For each member, we create a refund transaction
+        final refundTransactions = _currentGroupMembers.map((member) {
+          final totalHeldForMember = group.contribution * group.maxMembers * 0.10;
+          return {
+            'group_id': group.id,
+            'user_id': member.userId,
+            'type': 'held_refund',
+            'amount': totalHeldForMember,
+            'round': group.maxMembers,
+            'date': DateTime.now().toIso8601String(),
+            'description': 'Cycle Completion: Refund of 10% Held Savings',
+          };
+        }).toList();
+
+        await _supabaseService.createTransactions(refundTransactions);
+        await loadGroupDetails(group.id);
+      } else if (allPaid && !isLastRound) {
+        // If all paid for CURRENT round but not last, increment round
+        // This logic might be handled by another method, but we can do it here too
+        final currentRoundPayments = allContributions.where((c) => c.round == group.currentRound && c.status == 'paid');
+        if (currentRoundPayments.length == group.maxMembers) {
+           await _supabaseService.updateGroupRound(group.id, group.currentRound + 1);
+           await loadGroupDetails(group.id);
+        }
+      }
+
       return true;
     } catch (e) {
       print('Error verifying payment: $e');

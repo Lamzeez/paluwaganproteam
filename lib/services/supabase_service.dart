@@ -85,6 +85,14 @@ class SupabaseService {
     await _supabase.from('group_members').insert(memberData);
   }
 
+  Future<void> removeMember(int groupId, String userId) async {
+    await _supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('user_id', userId);
+  }
+
   Future<List<Map<String, dynamic>>> getUserGroups(String userId) async {
     // Since creators are added as members, we just need to find groups 
     // where the user is in the group_members table.
@@ -96,12 +104,11 @@ class SupabaseService {
   }
 
   Future<Map<String, dynamic>?> findGroupByCode(String joinCode) async {
-    return await _supabase
-        .from('groups')
-        .select()
-        .eq('join_code', joinCode)
-        .eq('status', 'active')
-        .maybeSingle();
+    final response = await _supabase
+        .rpc('find_group_by_code', params: {'join_code_param': joinCode});
+    
+    if (response == null || (response as List).isEmpty) return null;
+    return response[0] as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> getGroupDetails(int groupId) async {
@@ -115,6 +122,18 @@ class SupabaseService {
 
   Future<void> updateGroupStatus(int groupId, String status) async {
     await _supabase.from('groups').update({'group_status': status}).eq('id', groupId);
+  }
+
+  Future<void> updateGroupRound(int groupId, int round) async {
+    await _supabase.from('groups').update({'current_round': round}).eq('id', groupId);
+  }
+
+  Future<void> updateGroupMemberCount(int groupId, int count) async {
+    await _supabase.from('groups').update({'current_members': count}).eq('id', groupId);
+  }
+
+  Future<void> deleteGroup(int groupId) async {
+    await _supabase.from('groups').delete().eq('id', groupId);
   }
 
   Future<void> createRoundRotations(List<Map<String, dynamic>> rotations) async {
@@ -155,6 +174,14 @@ class SupabaseService {
     }).eq('id', contributionId);
   }
 
+  Future<void> createTransaction(Map<String, dynamic> transactionData) async {
+    await _supabase.from('transactions').insert(transactionData);
+  }
+
+  Future<void> createTransactions(List<Map<String, dynamic>> transactions) async {
+    await _supabase.from('transactions').insert(transactions);
+  }
+
   Future<user_model.User?> getUserById(String userId) async {
     final response = await _supabase.from('profiles').select().eq('id', userId).maybeSingle();
     if (response == null) return null;
@@ -169,10 +196,48 @@ class SupabaseService {
         .order('created_at');
   }
 
+  Stream<Map<String, dynamic>> streamGroup(int groupId) {
+    return _supabase
+        .from('groups')
+        .stream(primaryKey: ['id'])
+        .eq('id', groupId)
+        .limit(1)
+        .map((data) => data.first);
+  }
+
   Stream<List<Map<String, dynamic>>> streamMembers(int groupId) {
     return _supabase
         .from('group_members')
         .stream(primaryKey: ['id'])
         .eq('group_id', groupId);
+  }
+
+  Stream<List<Map<String, dynamic>>> streamContributions(int groupId) {
+    return _supabase
+        .from('contributions')
+        .stream(primaryKey: ['id'])
+        .eq('group_id', groupId);
+  }
+
+  Stream<List<Map<String, dynamic>>> streamRotations(int groupId) {
+    return _supabase
+        .from('round_rotations')
+        .stream(primaryKey: ['id'])
+        .eq('group_id', groupId);
+  }
+
+  Stream<List<Map<String, dynamic>>> streamPaymentProofs(int groupId) {
+    return _supabase
+        .from('payment_proofs')
+        .stream(primaryKey: ['id'])
+        .eq('group_id', groupId);
+  }
+
+  Stream<List<Map<String, dynamic>>> streamChat(int groupId) {
+    return _supabase
+        .from('group_chat')
+        .stream(primaryKey: ['id'])
+        .eq('group_id', groupId)
+        .order('timestamp');
   }
 }
