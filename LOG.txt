@@ -1,2 +1,218 @@
-E/SQLiteLog( 5099): (1) table contributions has no column named recipient_id
-I/flutter ( 5099): Error loading group details: DatabaseException(table contributions has no column named recipient_id (code 1 SQLITE_ERROR): , while compiling: INSERT OR REPLACE INTO contributions (id, group_id, user_id, amount, round, status, due_date, paid_at, recipient_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)) sql 'INSERT OR REPLACE INTO contributions (id, group_id, user_id, amount, round, status, due_date, paid_at, recipient_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)' args [48, 23, 14fa3052-17d2-432b-85b4-30f0f77f1baf, 200.0, 1, paid, 2026-04-20T00:00:00.000Z, 2026-03-20T16:55:58.718086Z, 14fa3052-17d2-432b-85b4-30f0f77f1baf]
+lib/views/group_detail_view.dart:84:47: Error: Can't find ')' to match '('.
+    return StreamBuilder<Map<String, dynamic>>(
+                                              ^
+lib/views/group_detail_view.dart:27:41: Error: Can't find '}' to match '{'.
+    with SingleTickerProviderStateMixin {
+                                        ^
+lib/views/group_detail_view.dart:293:3: Error: Expected ',' before this.
+  Widget _buildOverviewTab(
+  ^^^^^^
+lib/views/group_detail_view.dart:293:10: Error: A function expression can't have a name.
+  Widget _buildOverviewTab(
+         ^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:817:3: Error: Expected ',' before this.
+  Widget _buildPendingContributionTile(
+  ^^^^^^
+lib/views/group_detail_view.dart:817:10: Error: A function expression can't have a name.
+  Widget _buildPendingContributionTile(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:985:3: Error: Expected ',' before this.
+  Widget _buildPendingVerificationTile(
+  ^^^^^^
+lib/views/group_detail_view.dart:985:10: Error: A function expression can't have a name.
+  Widget _buildPendingVerificationTile(
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1044:3: Error: Expected ',' before this.
+  Widget _buildMembersTab(
+  ^^^^^^
+lib/views/group_detail_view.dart:1044:10: Error: A function expression can't have a name.
+  Widget _buildMembersTab(
+         ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1278:3: Error: Expected ',' before this.
+  Widget _buildTrustBadge(double score, bool isNew) {
+  ^^^^^^
+lib/views/group_detail_view.dart:1278:10: Error: A function expression can't have a name.
+  Widget _buildTrustBadge(double score, bool isNew) {
+         ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1317:3: Error: Expected ',' before this.
+  Future<bool> _showConfirmDialog(BuildContext context, String title, String content) async {
+  ^^^^^^
+lib/views/group_detail_view.dart:1317:16: Error: A function expression can't have a name.
+  Future<bool> _showConfirmDialog(BuildContext context, String title, String content) async {
+               ^^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1334:3: Error: Expected ',' before this.
+  Widget _buildScheduleTab(
+  ^^^^^^
+lib/views/group_detail_view.dart:1334:10: Error: A function expression can't have a name.
+  Widget _buildScheduleTab(
+         ^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1507:3: Error: Expected ',' before this.
+  Widget _buildPaymentTab(
+  ^^^^^^
+lib/views/group_detail_view.dart:1507:10: Error: A function expression can't have a name.
+  Widget _buildPaymentTab(
+         ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:84:47: Error: Too many positional arguments: 0 allowed, but 8 found.
+Try removing the extra positional arguments.
+    return StreamBuilder<Map<String, dynamic>>(
+                                              ^
+/D:/flutter_windows_3.38.9-stable/flutter/packages/flutter/lib/src/widgets/async.dart:412:9: Context:   
+Found this candidate, but the arguments don't match.
+  const StreamBuilder({super.key, this.initialData, required super.stream, required this.builder});     
+        ^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1694:3: Error: Expected ';' after this.
+  }
+  ^
+lib/views/group_detail_view.dart:1465:62: Error: Local variable '_showReceiptImage' can't be referenced 
+before it is declared.
+                                            onPressed: () => _showReceiptImage(context,
+                                            proof.screenshotPath),
+                                                             ^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1696:8: Context: This is the declaration of the variable
+'_showReceiptImage'.
+  void _showReceiptImage(BuildContext context, String path) {
+       ^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1656:62: Error: Local variable '_showReceiptImage' can't be referenced 
+before it is declared.
+                                            onPressed: () => _showReceiptImage(context,
+                                            proof.screenshotPath),
+                                                             ^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1696:8: Context: This is the declaration of the variable
+'_showReceiptImage'.
+  void _showReceiptImage(BuildContext context, String path) {
+       ^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:279:19: Error: Local variable '_buildChatTab' can't be referenced      
+before it is declared.
+                  _buildChatTab(
+                  ^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1725:10: Context: This is the declaration of the variable
+'_buildChatTab'.
+  Widget _buildChatTab(
+         ^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:598:27: Error: Local variable '_buildStatCard' can't be referenced     
+before it is declared.
+                          _buildStatCard(
+                          ^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1937:10: Context: This is the declaration of the variable
+'_buildStatCard'.
+  Widget _buildStatCard(
+         ^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:605:27: Error: Local variable '_buildStatCard' can't be referenced     
+before it is declared.
+                          _buildStatCard(
+                          ^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1937:10: Context: This is the declaration of the variable
+'_buildStatCard'.
+  Widget _buildStatCard(
+         ^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:614:27: Error: Local variable '_buildStatCard' can't be referenced     
+before it is declared.
+                          _buildStatCard(
+                          ^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1937:10: Context: This is the declaration of the variable
+'_buildStatCard'.
+  Widget _buildStatCard(
+         ^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:621:27: Error: Local variable '_buildStatCard' can't be referenced
+before it is declared.
+                          _buildStatCard(
+                          ^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1937:10: Context: This is the declaration of the variable
+'_buildStatCard'.
+  Widget _buildStatCard(
+         ^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:700:49: Error: Local variable '_formatDateWithYear' can't be referencedbefore it is declared.
+                                                _formatDateWithYear(rotation.payoutDate),
+                                                ^^^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1999:10: Context: This is the declaration of the variable
+'_formatDateWithYear'.
+  String _formatDateWithYear(DateTime date) {
+         ^^^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:898:31: Error: Local variable '_formatDateWithYear' can't be referencedbefore it is declared.
+                      'Due: ${_formatDateWithYear(contribution.dueDate)}',
+                              ^^^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1999:10: Context: This is the declaration of the variable
+'_formatDateWithYear'.
+  String _formatDateWithYear(DateTime date) {
+         ^^^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1425:42: Error: Local variable '_formatDateWithYear' can't be
+referenced before it is declared.
+                                    Text(_formatDateWithYear(rotation.payoutDate), style: const
+                                    TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                         ^^^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1999:10: Context: This is the declaration of the variable
+'_formatDateWithYear'.
+  String _formatDateWithYear(DateTime date) {
+         ^^^^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:2000:15: Error: Local variable '_getMonthName' can't be referenced     
+before it is declared.
+    return '${_getMonthName(date.month)} ${date.day}, ${date.year}';
+              ^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:2003:10: Context: This is the declaration of the variable
+'_getMonthName'.
+  String _getMonthName(int month) {
+         ^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1851:35: Error: Local variable '_formatTime' can't be referenced beforeit is declared.
+                                  _formatTime(message.timestamp),
+                                  ^^^^^^^^^^^
+lib/views/group_detail_view.dart:2021:10: Context: This is the declaration of the variable
+'_formatTime'.
+  String _formatTime(DateTime date) {
+         ^^^^^^^^^^^
+lib/views/group_detail_view.dart:714:65: Error: Local variable '_getDaysUntil' can't be referenced      
+before it is declared.
+                                              isPast ? 'DONE' : _getDaysUntil(rotation.payoutDate),     
+                                                                ^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:2025:10: Context: This is the declaration of the variable
+'_getDaysUntil'.
+  String _getDaysUntil(DateTime date) {
+         ^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1002:11: Error: Local variable '_buildUserAvatar' can't be referenced  
+before it is declared.
+          _buildUserAvatar(
+          ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:2033:10: Context: This is the declaration of the variable
+'_buildUserAvatar'.
+  Widget _buildUserAvatar(String? profilePicture, String name, {String? userId, double radius = 20,     
+  Color? backgroundColor}) {
+         ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1150:23: Error: Local variable '_buildUserAvatar' can't be referenced  
+before it is declared.
+                      _buildUserAvatar(
+                      ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:2033:10: Context: This is the declaration of the variable
+'_buildUserAvatar'.
+  Widget _buildUserAvatar(String? profilePicture, String name, {String? userId, double radius = 20,     
+  Color? backgroundColor}) {
+         ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1806:27: Error: Local variable '_buildUserAvatar' can't be referenced  
+before it is declared.
+                          _buildUserAvatar(
+                          ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:2033:10: Context: This is the declaration of the variable
+'_buildUserAvatar'.
+  Widget _buildUserAvatar(String? profilePicture, String name, {String? userId, double radius = 20,     
+  Color? backgroundColor}) {
+         ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1806:27: Error: The method '_buildUserAvatar' isn't defined for the    
+type '_GroupDetailScreenState'.
+ - '_GroupDetailScreenState' is from 'package:paluwagan_pro/views/group_detail_view.dart'
+ ('lib/views/group_detail_view.dart').
+Try correcting the name to the name of an existing method, or defining a method named
+'_buildUserAvatar'.
+                          _buildUserAvatar(
+                          ^^^^^^^^^^^^^^^^
+lib/views/group_detail_view.dart:1851:35: Error: The method '_formatTime' isn't defined for the type    
+'_GroupDetailScreenState'.
+ - '_GroupDetailScreenState' is from 'package:paluwagan_pro/views/group_detail_view.dart'
+ ('lib/views/group_detail_view.dart').
+Try correcting the name to the name of an existing method, or defining a method named '_formatTime'.    
+                                  _formatTime(message.timestamp),
+                                  ^^^^^^^^^^^
+lib/views/group_detail_view.dart:2000:15: Error: The method '_getMonthName' isn't defined for the type  
+'_GroupDetailScreenState'.
+ - '_GroupDetailScreenState' is from 'package:paluwagan_pro/views/group_detail_view.dart'
+ ('lib/views/group_detail_view.dart').
+Try correcting the name to the name of an existing method, or defining a method named '_getMonthName'.  
+    return '${_getMonthName(date.month)} ${date.day}, ${date.year}';
+              ^^^^^^^^^^^^^

@@ -664,17 +664,21 @@ class _HomeContentState extends State<HomeContent> {
                     decoration: BoxDecoration(
                       color: group.groupStatus == 'active'
                           ? colorScheme.primary.withOpacity(0.08)
-                          : Colors.grey.withOpacity(0.08),
+                          : (group.groupStatus == 'completed'
+                              ? Colors.green.withOpacity(0.08)
+                              : Colors.grey.withOpacity(0.08)),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      group.groupStatus == 'active' ? 'Active' : 'Pending',
+                      group.groupStatus == 'active'
+                          ? 'Active'
+                          : (group.groupStatus == 'completed' ? 'Completed' : 'Pending'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: group.groupStatus == 'active'
                             ? colorScheme.primary
-                            : Colors.grey,
+                            : (group.groupStatus == 'completed' ? Colors.green : Colors.grey),
                       ),
                     ),
                   ),

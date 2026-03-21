@@ -134,28 +134,59 @@ class AllGroupsPage extends StatelessWidget {
 
                             const SizedBox(height: 12),
 
-                            // Creator/Member Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isCreator
-                                    ? colorScheme.primary.withOpacity(0.1)
-                                    : Colors.green.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                isCreator ? 'Creator' : 'Member',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: isCreator
-                                      ? colorScheme.primary
-                                      : Colors.green,
+                            // Creator/Member & Status Badges
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isCreator
+                                        ? colorScheme.primary.withOpacity(0.1)
+                                        : Colors.green.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    isCreator ? 'Creator' : 'Member',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isCreator
+                                          ? colorScheme.primary
+                                          : Colors.green,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: g.groupStatus == 'active'
+                                        ? colorScheme.primary.withOpacity(0.08)
+                                        : (g.groupStatus == 'completed'
+                                            ? Colors.green.withOpacity(0.08)
+                                            : Colors.grey.withOpacity(0.08)),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    g.groupStatus == 'active'
+                                        ? 'Active'
+                                        : (g.groupStatus == 'completed' ? 'Completed' : 'Pending'),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: g.groupStatus == 'active'
+                                          ? colorScheme.primary
+                                          : (g.groupStatus == 'completed' ? Colors.green : Colors.grey),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
 
                             const SizedBox(height: 12),

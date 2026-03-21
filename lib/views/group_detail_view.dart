@@ -122,6 +122,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   );
                 }
 
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream: groupsVm.streamRotations(widget.groupId),
+              builder: (context, rotationSnapshot) {
+                final rotations = rotationSnapshot.data?.map((r) => RoundRotation.fromMap(r)).toList() 
+                    ?? groupsVm.roundRotations;
+                
+                final allRotationsDone = rotations.isNotEmpty && rotations.every((r) => r.status == 'completed');
+                final effectiveGroupStatus = allRotationsDone ? 'completed' : group.groupStatus;
+
                 return Scaffold(
                   appBar: AppBar(
                     backgroundColor: Colors.white,
@@ -194,28 +203,30 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: group.groupStatus == 'active'
+                              color: effectiveGroupStatus == 'active'
                                   ? colorScheme.primary.withOpacity(0.08)
-                                  : (group.groupStatus == 'completed'
+                                  : (effectiveGroupStatus == 'completed'
                                       ? Colors.green.withOpacity(0.08)
                                       : Colors.grey.withOpacity(0.08)),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: group.groupStatus == 'active'
+                                color: effectiveGroupStatus == 'active'
                                     ? colorScheme.primary.withOpacity(0.2)
-                                    : (group.groupStatus == 'completed'
+                                    : (effectiveGroupStatus == 'completed'
                                         ? Colors.green.withOpacity(0.2)
                                         : Colors.grey.withOpacity(0.2)),
                               ),
                             ),
                             child: Text(
-                              (group.groupStatus ?? 'PENDING').toUpperCase(),
+                              (effectiveGroupStatus == 'active'
+                                  ? 'Active'
+                                  : (effectiveGroupStatus == 'completed' ? 'Completed' : 'Pending')).toUpperCase(),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: group.groupStatus == 'active'
+                                color: effectiveGroupStatus == 'active'
                                     ? colorScheme.primary
-                                    : (group.groupStatus == 'completed' ? Colors.green : Colors.grey),
+                                    : (effectiveGroupStatus == 'completed' ? Colors.green : Colors.grey),
                               ),
                             ),
                           ),
@@ -277,6 +288,50 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         );
       }
     );
+  }
+);
+  }
+
+  Widget _buildMemberAvatar({
+    required String name,
+    required String userId,
+    String? profilePicture,
+    double radius = 24,
+    double fontSize = 16,
+    Color? backgroundColor,
+    Color? textColor,
+  }) {
+    final groupsVm = context.read<GroupsViewModel>();
+    final imageUrl = profilePicture ?? groupsVm.profileCache[userId];
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: backgroundColor ?? Colors.grey.shade300,
+      backgroundImage: imageUrl != null
+          ? (imageUrl.startsWith('http')
+              ? NetworkImage(imageUrl) as ImageProvider
+              : FileImage(File(imageUrl)))
+          : null,
+      child: imageUrl == null
+          ? Text(
+              _getInitials(name),
+              style: TextStyle(
+                fontSize: fontSize,
+                color: textColor ?? Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            )
+          : null,
+    );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
   Widget _buildOverviewTab(
@@ -1141,21 +1196,18 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   ),
                   child: Row(
                     children: [
-                      CircleAvatar(
+                      _buildMemberAvatar(
+                        name: member.userName,
+                        userId: member.userId,
+                        profilePicture: member.profilePicture,
                         radius: 24,
+                        fontSize: 16,
                         backgroundColor: isCurrentUser
                             ? colorScheme.primary
                             : isCreator 
                                 ? Colors.orange.shade100 
                                 : Colors.grey.shade300,
-                        child: Text(
-                          member.userName[0].toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: isCurrentUser ? Colors.white : Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        textColor: isCurrentUser ? Colors.white : Colors.black,
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -1802,21 +1854,18 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       mainAxisAlignment: isMe
                           ? MainAxisAlignment.end
                           : MainAxisAlignment.start,
                       children: [
                         if (!isMe) ...[
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Colors.grey.shade300,
-                            child: Text(
-                              message.userName[0].toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                          _buildMemberAvatar(
+                            name: message.userName,
+                            userId: message.userId,
+                            profilePicture: message.profilePicture,
+                            radius: 18,
+                            fontSize: 12,
                           ),
                           const SizedBox(width: 8),
                         ],
@@ -1870,7 +1919,18 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                             ),
                           ),
                         ),
-                        if (isMe) const SizedBox(width: 8),
+                        if (isMe) ...[
+                          const SizedBox(width: 8),
+                          _buildMemberAvatar(
+                            name: currentUser.fullName,
+                            userId: currentUser.id,
+                            profilePicture: currentUser.profilePicture,
+                            radius: 18,
+                            fontSize: 12,
+                            backgroundColor: colorScheme.primary,
+                            textColor: Colors.white,
+                          ),
+                        ],
                       ],
                     ),
                   );

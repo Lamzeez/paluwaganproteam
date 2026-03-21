@@ -527,32 +527,44 @@ for (var member in members) {
       if (latestGroup == null) return true;
 
       // Specifically check if all members for THIS round are paid
-      final currentRoundPayments = allContributions.where((c) => c.round == latestGroup.currentRound && c.status == 'paid');
-      
-      if (currentRoundPayments.length == latestGroup.maxMembers) {
-        // ROUND FINISHED!
-        
+      // The recipient's contribution is auto-marked 'paid' on group start.
+      // So when everyone has paid, the total 'paid' count should equal total members.
+      final roundToVerify = proof.round;
+      final currentRoundPayments = allContributions.where((c) => c.round == roundToVerify && c.status == 'paid');
+
+      if (currentRoundPayments.length >= latestGroup.maxMembers) {
+        // ROUND FINISHED!        
         // A. Increment recipient's received count
         await _supabaseService.updateMemberStats(latestGroup.id, proof.recipientId, incrementReceived: true);
         
-        // B. Mark current rotation as completed in round_rotations table
-        await _supabaseService.updateRotationStatus(latestGroup.id, latestGroup.currentRound, 'completed');
+        // B. Mark this rotation as completed
+        await _supabaseService.updateRotationStatus(latestGroup.id, roundToVerify, 'completed');
 
-        if (latestGroup.currentRound == latestGroup.maxMembers) {
+        // Refresh to get latest rotations
+        await loadGroupDetails(latestGroup.id);
+        final latestRotations = _roundRotations;
+        final allRotationsCompleted = latestRotations.every((r) => r.status == 'completed');
+
+        if (allRotationsCompleted || roundToVerify >= latestGroup.maxMembers) {
           // Final round finished
-          await _supabaseService.updateGroupStatus(latestGroup.id, 'completed');
-        } else {
-          // Move to next round in groups table
-          final nextRound = latestGroup.currentRound + 1;
+          try {
+            await _supabaseService.updateGroupStatus(latestGroup.id, 'completed', isFinal: true);
+            print('SUCCESS: Group ${latestGroup.id} marked as COMPLETED');
+          } catch (e) {
+            print('ERROR: Failed to update group status to completed: $e');
+            print('Check Supabase RLS policies for updating group status.');
+          }
+        } else if (roundToVerify == latestGroup.currentRound) {
+          // Only move to next round if we just finished the CURRENT active round
+          final nextRound = roundToVerify + 1;
           try {
             await _supabaseService.updateGroupRound(latestGroup.id, nextRound);
             print('Successfully updated group to round $nextRound');
+            await _supabaseService.updateRotationStatus(latestGroup.id, nextRound, 'in_progress');
           } catch (e) {
             print('CRITICAL: Failed to update group round in Supabase: $e');
-            // We continue to update rotation status as a fallback so at least the schedule tab works
+            print('This is likely a Row Level Security (RLS) permission error.');
           }
-          
-          await _supabaseService.updateRotationStatus(latestGroup.id, nextRound, 'in_progress');
         }
         
         // Final reload to sync everything

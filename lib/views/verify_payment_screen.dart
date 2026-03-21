@@ -260,12 +260,19 @@ class _VerifyPaymentScreenState extends State<VerifyPaymentScreen> {
                   if (proof.screenshotPath.isNotEmpty)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(proof.screenshotPath),
-                        height: 300,
-                        width: double.infinity,
-                        fit: BoxFit.contain,
-                      ),
+                      child: proof.screenshotPath.startsWith('http')
+                          ? Image.network(
+                              proof.screenshotPath,
+                              height: 300,
+                              width: double.infinity,
+                              fit: BoxFit.contain,
+                            )
+                          : Image.file(
+                              File(proof.screenshotPath),
+                              height: 300,
+                              width: double.infinity,
+                              fit: BoxFit.contain,
+                            ),
                     )
                   else
                     Container(

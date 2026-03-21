@@ -124,8 +124,12 @@ class SupabaseService {
     return response;
   }
 
-  Future<void> updateGroupStatus(int groupId, String status) async {
-    await _supabase.from('groups').update({'group_status': status}).eq('id', groupId);
+  Future<void> updateGroupStatus(int groupId, String status, {bool isFinal = false}) async {
+    final updates = {'group_status': status};
+    if (isFinal) {
+      updates['status'] = 'completed';
+    }
+    await _supabase.from('groups').update(updates).eq('id', groupId);
   }
 
   Future<void> updateGroupRound(int groupId, int round) async {
