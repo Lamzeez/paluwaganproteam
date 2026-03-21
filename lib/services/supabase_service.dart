@@ -273,6 +273,7 @@ class SupabaseService {
     return _supabase
         .from('group_chat')
         .stream(primaryKey: ['id'])
-        .eq('group_id', groupId);
+        .eq('group_id', groupId)
+        .order('timestamp', ascending: true);
   }
 }
