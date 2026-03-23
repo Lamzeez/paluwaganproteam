@@ -302,7 +302,7 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   // Update password method
-  Future<bool> updatePassword(String newPassword) async {
+  Future<bool> updatePassword(String currentPassword, String newPassword) async {
     if (_currentUser == null) return false;
 
     final db = await _dbService.database;
@@ -311,6 +311,13 @@ class AuthViewModel extends ChangeNotifier {
     _setError(null);
 
     try {
+      await _supabaseService.signIn(
+        email: _currentUser!.email,
+        password: currentPassword,
+      );
+
+      await _supabaseService.updateAuthPassword(newPassword: newPassword);
+
       await db.update(
         'users',
         {'password': newPassword},
@@ -318,7 +325,6 @@ class AuthViewModel extends ChangeNotifier {
         whereArgs: [_currentUser!.id],
       );
 
-      // Update current user's password
       _currentUser = User(
         id: _currentUser!.id,
         fullName: _currentUser!.fullName,
@@ -339,6 +345,14 @@ class AuthViewModel extends ChangeNotifier {
 
       notifyListeners();
       return true;
+    } on supabase.AuthException catch (e) {
+      final normalizedMessage = e.message.toLowerCase();
+      if (normalizedMessage.contains('invalid login credentials')) {
+        _setError('Incorrect current password');
+      } else {
+        _setError(e.message);
+      }
+      return false;
     } catch (e) {
       _setError('Failed to update password');
       return false;

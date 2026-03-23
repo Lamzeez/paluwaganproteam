@@ -219,16 +219,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    // Check if current password is correct
-    if (_currentPasswordController.text != user.password) {
-      setState(() {
-        _errorMessage = 'Current password is incorrect';
-      });
-      return;
-    }
-
     // Check if new password is same as current password
-    if (_newPasswordController.text == user.password) {
+    if (_newPasswordController.text == _currentPasswordController.text) {
       setState(() {
         _errorMessage = 'New password must be different from current password';
       });
@@ -251,7 +243,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _errorMessage = null;
     });
 
-    final success = await authVm.updatePassword(_newPasswordController.text);
+    final success = await authVm.updatePassword(
+      _currentPasswordController.text,
+      _newPasswordController.text,
+    );
 
     setState(() {
       _isLoading = false;
@@ -262,7 +257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _confirmPasswordController.clear();
         _isChangingPassword = false;
       } else {
-        _errorMessage = 'Failed to update password';
+        _errorMessage = authVm.errorMessage ?? 'Failed to update password';
       }
     });
 
@@ -280,6 +275,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _formatDate(DateTime? date) {
     if (date == null) return 'Unknown';
     return DateFormat('MMMM dd, yyyy').format(date);
+  }
+
+  ImageProvider? _buildImageProvider(String? path) {
+    if (path == null || path.isEmpty) return null;
+    return path.startsWith('http')
+        ? NetworkImage(path)
+        : FileImage(File(path));
+  }
+
+  Widget _buildQrPreviewCard({
+    required String? imagePath,
+  }) {
+    if (imagePath == null || imagePath.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Text(
+          'No InstaPay QR Code uploaded',
+          style: TextStyle(fontSize: 14, color: Colors.grey),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: Image(
+            image: _buildImageProvider(imagePath)!,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                alignment: Alignment.center,
+                color: Colors.grey.shade100,
+                child: const Text('Unable to load QR code'),
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -548,6 +596,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   isEditing: _isEditing,
                   keyboardType: TextInputType.phone,
                   textColor: Colors.black87,
+                ),
+                const SizedBox(height: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Current InstaPay QR Code',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildQrPreviewCard(
+                      imagePath: _newQrPath ?? user.urcodePath,
+                    ),
+                  ],
                 ),
                 if (_isEditing) ...[
                   const SizedBox(height: 16),

@@ -30,6 +30,14 @@ class SupabaseService {
     );
   }
 
+  Future<UserResponse> updateAuthPassword({
+    required String newPassword,
+  }) async {
+    return await _supabase.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
+  }
+
   Future<AuthResponse> verifyOTP({
     required String email,
     required String token,
