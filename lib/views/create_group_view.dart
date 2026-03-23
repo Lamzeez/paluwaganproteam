@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../viewmodels/groups_viewmodel.dart';
@@ -143,8 +144,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.copy, size: 24),
-                        onPressed: () {
-                          // Copy to clipboard
+                        onPressed: () async {
+                          await Clipboard.setData(ClipboardData(text: code));
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Code copied!'),

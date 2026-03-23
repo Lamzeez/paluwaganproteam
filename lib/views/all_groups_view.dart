@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/paluwagan_group.dart';
@@ -294,7 +295,11 @@ class AllGroupsPage extends StatelessWidget {
                                     ),
                                     const Spacer(),
                                     GestureDetector(
-                                      onTap: () {
+                                      onTap: () async {
+                                        await Clipboard.setData(
+                                          ClipboardData(text: g.joinCode),
+                                        );
+                                        if (!context.mounted) return;
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(

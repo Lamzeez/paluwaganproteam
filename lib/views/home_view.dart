@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/user.dart';
@@ -820,7 +821,11 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                       const SizedBox(width: 4),
                       GestureDetector(
-                        onTap: () {
+                        onTap: () async {
+                          await Clipboard.setData(
+                            ClipboardData(text: group.joinCode),
+                          );
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Code copied to clipboard'),
