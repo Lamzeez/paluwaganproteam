@@ -14,6 +14,7 @@ class User {
     this.gcashName,
     this.gcashNumber,
     this.urcodePath,
+    this.isDeleted = false,
     this.createdAt,
   });
 
@@ -31,6 +32,7 @@ class User {
   String? gcashName;
   String? gcashNumber;
   String? urcodePath;
+  bool isDeleted;
   DateTime? createdAt;
 
   Map<String, dynamic> toMap() {
@@ -49,6 +51,7 @@ class User {
       'gcash_name': gcashName,
       'gcash_number': gcashNumber,
       'urcode_path': urcodePath,
+      'is_deleted': isDeleted ? 1 : 0,
       'created_at': createdAt?.toIso8601String(),
     };
   }
@@ -69,6 +72,7 @@ class User {
       gcashName: map['gcash_name'] as String?,
       gcashNumber: map['gcash_number'] as String?,
       urcodePath: map['urcode_path'] as String?,
+      isDeleted: map['is_deleted'] == true || map['is_deleted'] == 1,
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'] as String)
           : null,

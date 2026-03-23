@@ -36,7 +36,7 @@ class GroupChat {
     return GroupChat(
       id: map['id'] as int,
       groupId: map['group_id'] as int,
-      userId: map['user_id'].toString(),
+      userId: map['user_id']?.toString() ?? '',
       userName: map['user_name'] as String,
       message: map['message'] as String,
       timestamp: DateTime.parse(map['timestamp'] as String),

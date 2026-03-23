@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../viewmodels/auth_viewmodel.dart';
+import '../viewmodels/groups_viewmodel.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,6 +17,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditing = false;
   bool _isLoading = false;
+  bool _isCheckingDeleteEligibility = false;
   String? _errorMessage;
   String? _successMessage;
 
@@ -328,6 +330,115 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _checkDeleteAccountEligibility() async {
+    final authVm = context.read<AuthViewModel>();
+    final groupsVm = context.read<GroupsViewModel>();
+    final user = authVm.currentUser;
+    if (user == null) return;
+
+    setState(() {
+      _isCheckingDeleteEligibility = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      await groupsVm.loadUserGroups(user.id);
+      final groups = List.of(groupsVm.groups);
+
+      final activeGroups = groups.where((g) => g.groupStatus == 'active').toList();
+      final pendingGroups = groups.where((g) => g.groupStatus == 'pending').toList();
+      final completedGroups = groups
+          .where((g) => g.groupStatus == 'completed')
+          .toList();
+
+      if (!mounted) return;
+
+      final activeNames = activeGroups.map((g) => g.name).join(', ');
+      final pendingNames = pendingGroups.map((g) => g.name).join(', ');
+      final canDelete = activeGroups.isEmpty && pendingGroups.isEmpty;
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Delete Account',
+            style: TextStyle(fontSize: 18),
+          ),
+          content: SingleChildScrollView(
+            child: Text(
+              activeGroups.isNotEmpty
+                  ? 'You cannot delete your account while you are in active groups.\n\nActive groups: $activeNames\n\nLeave or complete these groups first.'
+                  : pendingGroups.isNotEmpty
+                  ? 'You cannot delete your account while you are still in pending groups.\n\nPending groups: $pendingNames\n\nLeave these groups first. If you created any pending group, delete or transfer it before deleting your account.'
+                  : completedGroups.isNotEmpty
+                  ? 'Your account is only linked to completed groups now.\n\nThis deletion will anonymize your completed-group history as Deleted User and release your old email so it can be used again later.'
+                  : 'Your account is not in any active or pending groups.\n\nYour account can be deleted now. This will sign you out and remove access to this account.',
+              style: const TextStyle(fontSize: 15),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(fontSize: 15, color: Colors.grey),
+              ),
+            ),
+            if (canDelete)
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _performDeleteAccount();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(fontSize: 15, color: Colors.white),
+                ),
+              ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingDeleteEligibility = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _performDeleteAccount() async {
+    final authVm = context.read<AuthViewModel>();
+
+    setState(() {
+      _isCheckingDeleteEligibility = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    final success = await authVm.deleteOwnAccount();
+    if (!mounted) return;
+
+    setState(() {
+      _isCheckingDeleteEligibility = false;
+      if (!success) {
+        _errorMessage = authVm.errorMessage ?? 'Failed to delete account';
+      }
+    });
+
+    if (success) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    }
   }
 
   @override
@@ -1008,6 +1119,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: _isCheckingDeleteEligibility
+                      ? null
+                      : _checkDeleteAccountEligibility,
+                  icon: _isCheckingDeleteEligibility
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline, size: 20),
+                  label: Text(
+                    _isCheckingDeleteEligibility
+                        ? 'CHECKING ACCOUNT STATUS...'
+                        : 'DELETE ACCOUNT',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:functions_client/functions_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../services/db_service.dart';
@@ -432,6 +433,45 @@ class AuthViewModel extends ChangeNotifier {
     } catch (e) {
       print('Error updating profile: $e');
       _setError('Failed to update profile: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> deleteOwnAccount() async {
+    if (_currentUser == null) return false;
+    if (_supabaseService.currentSession == null) {
+      _setError('Please log in again before deleting your account');
+      return false;
+    }
+
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      await _supabaseService.deleteOwnAccount();
+      await _supabaseService.signOut();
+      _currentUser = null;
+      notifyListeners();
+      return true;
+    } on FunctionException catch (e) {
+      final details = e.details;
+      if (details is Map && details['error'] is String) {
+        _setError(details['error'] as String);
+      } else if (details is String && details.isNotEmpty) {
+        _setError(details);
+      } else if (e.reasonPhrase != null && e.reasonPhrase!.isNotEmpty) {
+        _setError('${e.reasonPhrase} (${e.status})');
+      } else {
+        _setError('Failed to delete account (${e.status})');
+      }
+      return false;
+    } on supabase.AuthException catch (e) {
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      _setError('Failed to delete account');
       return false;
     } finally {
       _setLoading(false);

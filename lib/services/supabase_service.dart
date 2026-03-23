@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:functions_client/functions_client.dart';
+import '../config/supabase_config.dart';
 import '../models/user.dart' as user_model;
 import '../models/paluwagan_group.dart';
 import '../models/group_member.dart';
@@ -35,6 +37,19 @@ class SupabaseService {
   }) async {
     return await _supabase.auth.updateUser(
       UserAttributes(password: newPassword),
+    );
+  }
+
+  Future<FunctionResponse> deleteOwnAccount() async {
+    final accessToken = _supabase.auth.currentSession?.accessToken;
+    final headers = <String, String>{
+      'apikey': SupabaseConfig.anonKey,
+      if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+    };
+
+    return await _supabase.functions.invoke(
+      'delete-account',
+      headers: headers,
     );
   }
 

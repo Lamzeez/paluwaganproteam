@@ -36,7 +36,7 @@ class Transaction {
     return Transaction(
       id: map['id'] as int,
       groupId: map['group_id'] as int,
-      userId: map['user_id'].toString(),
+      userId: map['user_id']?.toString() ?? '',
       type: map['type'] as String,
       amount: map['amount'] as double,
       round: map['round'] as int,

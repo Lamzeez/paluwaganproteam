@@ -21,7 +21,7 @@ class DbService {
 
     return openDatabase(
       dbPath,
-      version: 12, // Increment version for profile_picture in group_members
+      version: 13, // Increment version for deleted profile support
       onCreate: (db, version) async {
         await _createSchema(db);
         await _seedInitialData(db);
@@ -38,6 +38,7 @@ class DbService {
         if (oldVersion < 10) await _upgradeToV10(db);
         if (oldVersion < 11) await _upgradeToV11(db);
         if (oldVersion < 12) await _upgradeToV12(db);
+        if (oldVersion < 13) await _upgradeToV13(db);
       },
     );
   }
@@ -60,6 +61,7 @@ class DbService {
         gcash_name TEXT,
         gcash_number TEXT,
         urcode_path TEXT,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       );
     ''');
@@ -540,6 +542,17 @@ class DbService {
       print('Added profile_picture column to group_members table');
     } catch (e) {
       print('profile_picture column migration note: $e');
+    }
+  }
+
+  Future<void> _upgradeToV13(Database db) async {
+    try {
+      await db.execute(
+        'ALTER TABLE users ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;',
+      );
+      print('Added is_deleted column to users table');
+    } catch (e) {
+      print('is_deleted column migration note: $e');
     }
   }
 
