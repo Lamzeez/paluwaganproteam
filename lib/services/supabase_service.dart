@@ -42,6 +42,15 @@ class SupabaseService {
     );
   }
 
+  Future<ResendResponse> resendSignupOTP({
+    required String email,
+  }) async {
+    return await _supabase.auth.resend(
+      email: email,
+      type: OtpType.signup,
+    );
+  }
+
   Future<void> signOut() async {
     await _supabase.auth.signOut();
   }

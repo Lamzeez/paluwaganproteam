@@ -16,6 +16,7 @@ class AuthViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   bool _isWaitingForEmailVerification = false;
+  DateTime? _lastVerificationEmailSentAt;
 
   static String? validateStrongPassword(String? value) {
     if (value == null || value.isEmpty) {
@@ -40,6 +41,7 @@ class AuthViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isWaitingForEmailVerification => _isWaitingForEmailVerification;
+  DateTime? get lastVerificationEmailSentAt => _lastVerificationEmailSentAt;
 
   void _setLoading(bool value) {
     _isLoading = value;
@@ -102,6 +104,7 @@ class AuthViewModel extends ChangeNotifier {
       }, conflictAlgorithm: ConflictAlgorithm.replace);
 
       _isWaitingForEmailVerification = true;
+      _lastVerificationEmailSentAt = DateTime.now();
       notifyListeners();
       return true;
     } catch (e) {
@@ -154,6 +157,26 @@ class AuthViewModel extends ChangeNotifier {
       return false;
     } catch (e) {
       _setError('Verification failed: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> resendEmailOTP(String email) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      await _supabaseService.resendSignupOTP(email: email);
+      _lastVerificationEmailSentAt = DateTime.now();
+      notifyListeners();
+      return true;
+    } on supabase.AuthException catch (e) {
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      _setError('Failed to resend verification code');
       return false;
     } finally {
       _setLoading(false);
