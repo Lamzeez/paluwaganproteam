@@ -198,17 +198,27 @@ class GroupsViewModel extends ChangeNotifier {
       // 1. Find group in Cloud
       final groupData = await _supabaseService.findGroupByCode(joinCode);
       if (groupData == null) {
-        _setError('Invalid join code');
+        _setError('No group found with this join code. Please check and try again.');
         return false;
       }
 
       final group = PaluwaganGroup.fromMap(groupData);
-      if (group.currentMembers >= group.maxMembers) {
-        _setError('Group is full');
+
+      // 2. Check if user is already a member
+      final members = await _supabaseService.getMembers(group.id);
+      final isAlreadyMember = members.any((m) => m['user_id'] == userId);
+      
+      if (isAlreadyMember) {
+        _setError('You are already a member of this group.');
         return false;
       }
 
-      // 2. Add member in Cloud
+      if (group.currentMembers >= group.maxMembers) {
+        _setError('This group is already full. You cannot join at this time.');
+        return false;
+      }
+
+      // 3. Add member in Cloud
       await _supabaseService.addMember({
         'group_id': group.id,
         'user_id': userId,
@@ -217,13 +227,19 @@ class GroupsViewModel extends ChangeNotifier {
         'rotation_order': group.currentMembers + 1,
       });
 
-      // 3. Update member count in Cloud (also handled by DB trigger if implemented)
+      // 4. Update member count in Cloud
       await _supabaseService.updateGroupMemberCount(group.id, group.currentMembers + 1);
 
       await loadUserGroups(userId);
       return true;
     } catch (e) {
-      _setError('Failed to join group: $e');
+      final errorStr = e.toString();
+      if (errorStr.contains('23505') || errorStr.contains('unique constraint')) {
+        _setError('You are already a member of this group.');
+      } else {
+        _setError('Unable to join group. Please try again later.');
+      }
+      print('DEBUG: Join group error: $e');
       return false;
     } finally {
       _setLoading(false);

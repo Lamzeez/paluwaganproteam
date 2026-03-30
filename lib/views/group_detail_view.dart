@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 import '../models/paluwagan_group.dart';
 import '../models/group_member.dart';
@@ -65,11 +67,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
 
     _chatController.clear();
 
-    // Scroll to bottom after sending
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_chatScrollController.hasClients) {
-        _chatScrollController.jumpTo(
+        _chatScrollController.animateTo(
           _chatScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
         );
       }
     });
@@ -84,7 +87,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     return StreamBuilder<Map<String, dynamic>>(
       stream: groupsVm.streamGroup(widget.groupId),
       builder: (context, snapshot) {
-        // Fallback to ViewModel data if stream is loading
         final groupData = snapshot.data;
         final group = groupData != null 
             ? PaluwaganGroup.fromMap(groupData) 
@@ -93,34 +95,29 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         if (group == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Group Details')),
-            body: const Center(child: CircularProgressIndicator()),
+            body: const Center(child: CircularProgressIndicator(strokeWidth: 3)),
           );
         }
 
-            final isCreator = group.createdBy == authVm.currentUser?.id;
-            final progress = group.currentRound / group.maxMembers;
-            final isGroupCompleted = group.groupStatus == 'completed';
-            
-            // Use StreamBuilder for members to keep UI responsive
-            return StreamBuilder<List<Map<String, dynamic>>>(
-              stream: groupsVm.streamMembers(widget.groupId),
-              builder: (context, memberSnapshot) {
-                final members = memberSnapshot.data?.map((m) => GroupMember.fromMap(m)).toList() 
-                    ?? groupsVm.currentGroupMembers;
+        final isCreator = group.createdBy == authVm.currentUser?.id;
+        final progress = group.currentRound / group.maxMembers;
+        final isGroupCompleted = group.groupStatus == 'completed';
+        
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: groupsVm.streamMembers(widget.groupId),
+          builder: (context, memberSnapshot) {
+            final members = memberSnapshot.data?.map((m) => GroupMember.fromMap(m)).toList() 
+                ?? groupsVm.currentGroupMembers;
 
-                final userIsMember = members.any(
-                  (m) => m.userId == authVm.currentUser?.id,
-                );
+            final userIsMember = members.any((m) => m.userId == authVm.currentUser?.id);
+            final isGroupFull = members.length >= group.maxMembers;
 
-                // Check if group is full
-                final isGroupFull = members.length >= group.maxMembers;
-
-                if (!userIsMember && !isCreator) {
-                  return Scaffold(
-                    appBar: AppBar(title: Text(group.name)),
-                    body: const Center(child: Text('You are not a member of this group')),
-                  );
-                }
+            if (!userIsMember && !isCreator) {
+              return Scaffold(
+                appBar: AppBar(title: Text(group.name)),
+                body: const Center(child: Text('You are not a member of this group')),
+              );
+            }
 
             return StreamBuilder<List<Map<String, dynamic>>>(
               stream: groupsVm.streamRotations(widget.groupId),
@@ -132,155 +129,105 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                 final effectiveGroupStatus = allRotationsDone ? 'completed' : group.groupStatus;
 
                 return Scaffold(
+                  backgroundColor: const Color(0xFFF8FAFC),
                   appBar: AppBar(
                     backgroundColor: Colors.white,
-                    elevation: 0.5,
-                    toolbarHeight: isCreator ? 72 : 60,
+                    elevation: 0,
+                    centerTitle: false,
+                    leading: const BackButton(color: Color(0xFF1E293B)),
                     titleSpacing: 0,
-                    leading: const BackButton(color: Colors.black87),
-                    title: Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        if (isCreator)
+                          GestureDetector(
+                            onTap: () async {
+                              await Clipboard.setData(ClipboardData(text: group.joinCode));
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Join code copied!'), behavior: SnackBarBehavior.floating),
+                              );
+                            },
+                            child: Row(
                               children: [
                                 Text(
-                                  group.name,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
+                                  'Code: ${group.joinCode}',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: colorScheme.primary, letterSpacing: 0.5),
                                 ),
-                                if (isCreator) ...[
-                                  const SizedBox(height: 4),
-                                  GestureDetector(
-                                    onTap: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Join code copied!')),
-                                      );
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.grey.shade300),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.vpn_key_rounded, size: 12, color: Colors.grey.shade600),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            group.joinCode,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              letterSpacing: 1.5,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.grey.shade800,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Icon(Icons.copy_rounded, size: 10, color: Colors.grey.shade500),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                const SizedBox(width: 4),
+                                Icon(Icons.copy_rounded, size: 10, color: colorScheme.primary),
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
+                      ],
+                    ),
+                    actions: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: effectiveGroupStatus == 'active'
-                                  ? colorScheme.primary.withOpacity(0.08)
-                                  : (effectiveGroupStatus == 'completed'
-                                      ? Colors.green.withOpacity(0.08)
-                                      : Colors.grey.withOpacity(0.08)),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: effectiveGroupStatus == 'active'
-                                    ? colorScheme.primary.withOpacity(0.2)
-                                    : (effectiveGroupStatus == 'completed'
-                                        ? Colors.green.withOpacity(0.2)
-                                        : Colors.grey.withOpacity(0.2)),
-                              ),
+                                  ? colorScheme.primary.withOpacity(0.1)
+                                  : (effectiveGroupStatus == 'completed' ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1)),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              (effectiveGroupStatus == 'active'
-                                  ? 'Active'
-                                  : (effectiveGroupStatus == 'completed' ? 'Completed' : 'Pending')).toUpperCase(),
+                              effectiveGroupStatus.toUpperCase(),
                               style: TextStyle(
                                 fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w900,
                                 color: effectiveGroupStatus == 'active'
                                     ? colorScheme.primary
-                                    : (effectiveGroupStatus == 'completed' ? Colors.green : Colors.grey),
+                                    : (effectiveGroupStatus == 'completed' ? Colors.green : Colors.orange),
                               ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                    bottom: TabBar(
-                      controller: _tabController,
-                      isScrollable: false,
-                      indicatorSize: TabBarIndicatorSize.label,
-                      splashFactory: NoSplash.splashFactory,
-                      overlayColor: WidgetStateProperty.all(Colors.transparent),
-                      dividerColor: Colors.transparent,
-                      padding: EdgeInsets.zero,
-                      labelPadding: EdgeInsets.zero,
-                      labelStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.2,
+                    ],
+                    bottom: PreferredSize(
+                      preferredSize: const Size.fromHeight(48),
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                        ),
+                        child: TabBar(
+                          controller: _tabController,
+                          indicatorSize: TabBarIndicatorSize.tab,
+                          indicatorColor: colorScheme.primary,
+                          indicatorWeight: 3,
+                          labelColor: colorScheme.primary,
+                          unselectedLabelColor: const Color(0xFF94A3B8),
+                          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                          unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          tabs: const [
+                            Tab(text: 'Overview'),
+                            Tab(text: 'Members'),
+                            Tab(text: 'Schedule'),
+                            Tab(text: 'Chat'),
+                          ],
+                        ),
                       ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      tabs: const [
-                        Tab(text: 'Overview'),
-                        Tab(text: 'Members'),
-                        Tab(text: 'Schedule'),
-                        Tab(text: 'Chat'),
-                      ],
-                      labelColor: colorScheme.primary,
-                      unselectedLabelColor: Colors.grey,
-                      indicatorColor: colorScheme.primary,
-                      indicatorWeight: 3,
                     ),
                   ),
                   body: TabBarView(
                     controller: _tabController,
                     children: [
-                      // Overview Tab
                       _buildOverviewTab(context, group, members, progress, isCreator, isGroupFull),
-
-                      // Members Tab
                       _buildMembersTab(context, members, group),
-
-                      // Schedule Tab
                       _buildScheduleTab(context, group),
-
-                      // Chat Tab
-                      _buildChatTab(
-                        context,
-                        authVm.currentUser!,
-                        isGroupCompleted,
-                      ),
+                      _buildChatTab(context, authVm.currentUser!, isGroupCompleted),
                     ],
                   ),
                 );
@@ -290,48 +237,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         );
       },
     );
-  }
-
-  Widget _buildMemberAvatar({
-    required String name,
-    required String userId,
-    String? profilePicture,
-    double radius = 24,
-    double fontSize = 16,
-    Color? backgroundColor,
-    Color? textColor,
-  }) {
-    final groupsVm = context.read<GroupsViewModel>();
-    final imageUrl = profilePicture ?? groupsVm.profileCache[userId];
-
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: backgroundColor ?? Colors.grey.shade300,
-      backgroundImage: imageUrl != null
-          ? (imageUrl.startsWith('http')
-              ? NetworkImage(imageUrl) as ImageProvider
-              : FileImage(File(imageUrl)))
-          : null,
-      child: imageUrl == null
-          ? Text(
-              _getInitials(name),
-              style: TextStyle(
-                fontSize: fontSize,
-                color: textColor ?? Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
-            )
-          : null,
-    );
-  }
-
-  String _getInitials(String name) {
-    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '';
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
-    }
-    return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
   Widget _buildOverviewTab(
@@ -364,19 +269,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                 final proofs = proofSnapshot.data?.map((p) => PaymentProof.fromMap(p)).toList() 
                     ?? groupsVm.pendingPayments;
 
-                // Derive the ACTUAL current round from rotations
                 final activeRotation = rotations.firstWhere(
                   (r) => r.status == 'in_progress',
                   orElse: () => rotations.firstWhere(
                     (r) => r.round == group.currentRound,
                     orElse: () => rotations.isNotEmpty ? rotations.last : RoundRotation(
-                      id: 0,
-                      groupId: group.id,
-                      round: group.currentRound,
-                      payoutDate: DateTime.now(),
-                      recipientId: '',
-                      recipientName: 'TBD',
-                      status: 'pending',
+                      id: 0, groupId: group.id, round: group.currentRound, payoutDate: DateTime.now(),
+                      recipientId: '', recipientName: 'TBD', status: 'pending',
                     ),
                   ),
                 );
@@ -385,532 +284,92 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                 final completedRounds = rotations.where((r) => r.status == 'completed').length;
                 final totalRounds = rotations.isNotEmpty ? rotations.length : group.maxMembers;
 
-                // Get creator's name from members list
-                final creatorMember = members.firstWhere(
-                  (m) => m.userId == group.createdBy,
-                  orElse: () => GroupMember(
-                    id: 0,
-                    groupId: group.id,
-                    userId: group.createdBy,
-                    userName: 'Creator',
-                    joinedAt: DateTime.now(),
-                    paidContributions: 0,
-                    receivedPayouts: 0,
-                    rotationOrder: 0,
-                  ),
-                );
-
-                // Get current user's pending contributions
                 final pendingContributions = contributions
                     .where((c) => c.userId == currentUser?.id && c.status == 'pending')
                     .toList();
 
-                // Get current user's pending verifications (payments they need to verify)
                 final pendingVerifications = proofs
                     .where((p) => p.recipientId == currentUser?.id && p.status == 'pending')
                     .toList();
 
                 return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Group Completed Banner
                       if (group.groupStatus == 'completed') ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.green.shade200),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.stars,
-                                size: 48,
-                                color: Colors.green.shade700,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Congratulations!',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'This paluwagan cycle is fully completed. All members have received their payouts!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.green.shade800,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Ready for another round? Use the Chat tab to coordinate with your group mates about starting a new group!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.green.shade700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  _tabController.animateTo(3); // Go to Chat tab
-                                },
-                                icon: const Icon(Icons.chat_bubble_outline),
-                                label: const Text('DISCUSS NEXT PALUWAGAN'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green.shade600,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                        _buildStatusBanner(
+                          icon: Icons.stars_rounded,
+                          title: 'Cycle Completed!',
+                          message: 'All members have received their payouts.',
+                          color: Colors.green,
+                          actionLabel: 'DISCUSS NEXT',
+                          onAction: () => _tabController.animateTo(3),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
                       ],
 
-                      // Group Status Banner
                       if (group.groupStatus == 'pending') ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.orange.shade200),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.hourglass_empty,
-                                size: 40,
-                                color: Colors.orange.shade700,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Group Not Started',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Created by ${creatorMember.userName}',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.orange.shade700,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-
-                              // Show different message based on group status
-                              if (!isGroupFull)
-                                Text(
-                                  'Need ${group.maxMembers - members.length} more member(s) to start. Group will be ready to start when full (${group.maxMembers} members).',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.orange.shade700),
-                                )
-                              else
-                                Text(
-                                  'Group is now full! Ready to start.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.green.shade700,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-
-                              // Show start button if creator AND group is full
-                              if (isCreator && isGroupFull) ...[
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: () async {
-                                    final confirmed = await showDialog<bool>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Start Group'),
-                                        content: Text(
-                                          'Are you sure you want to start ${group.name}? '
-                                          'Once started, the rotation order will be randomized and rounds will begin.',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(true),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.green,
-                                              foregroundColor: Colors.white,
-                                            ),
-                                            child: const Text('Start Group'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-
-                                    if (confirmed == true) {
-                                      final success = await context
-                                          .read<GroupsViewModel>()
-                                          .startGroup(group.id);
-                                      if (success && mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Group started successfully!'),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                    minimumSize: const Size(200, 45),
-                                  ),
-                                  child: const Text(
-                                    'START GROUP NOW',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-
-                              // Delete Group Button for Creator
-                              if (isCreator) ...[
-                                const SizedBox(height: 12),
-                                OutlinedButton.icon(
-                                  onPressed: () async {
-                                    final confirmed = await showDialog<bool>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Delete Group'),
-                                        content: Text(
-                                          'Are you sure you want to delete ${group.name}? '
-                                          'This action cannot be undone and all data will be lost.',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(true),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.red,
-                                              foregroundColor: Colors.white,
-                                            ),
-                                            child: const Text('Delete'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-
-                                    if (confirmed == true) {
-                                      final success = await context
-                                          .read<GroupsViewModel>()
-                                          .deleteGroup(group.id);
-                                      if (success && mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Group deleted successfully'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                        Navigator.of(context).pop(); // Go back to Home
-                                      }
-                                    }
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.red,
-                                    side: const BorderSide(color: Colors.red),
-                                    minimumSize: const Size(200, 40),
-                                  ),
-                                  icon: const Icon(Icons.delete_outline, size: 18),
-                                  label: const Text('DELETE GROUP'),
-                                ),
-                              ],
-                            ],
-                          ),
+                        _buildStatusBanner(
+                          icon: Icons.hourglass_top_rounded,
+                          title: isGroupFull ? 'Ready to Start!' : 'Waiting for Members',
+                          message: isGroupFull 
+                              ? 'Group is now full and ready to begin.' 
+                              : 'Need ${group.maxMembers - members.length} more members.',
+                          color: isGroupFull ? Colors.green : Colors.orange,
+                          actionLabel: (isCreator && isGroupFull) ? 'START GROUP' : null,
+                          onAction: (isCreator && isGroupFull) ? () => _startGroup(group) : null,
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
                       ],
 
-                      // Pending Verifications Section
                       if (pendingVerifications.isNotEmpty) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.blue.shade200),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.verified, color: Colors.blue.shade700),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Pending Verifications (${pendingVerifications.length})',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              ...pendingVerifications.map(
-                                (proof) => _buildPendingVerificationTile(context, proof),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
+                        _buildSectionHeader('Pending Verifications'),
+                        ...pendingVerifications.map((p) => _buildPendingVerificationTile(context, p)),
+                        const SizedBox(height: 16),
                       ],
 
-                      // Stats Grid - UPDATED with derived values
                       GridView.count(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         crossAxisCount: 2,
-                        childAspectRatio: 1.5,
+                        childAspectRatio: 1.8,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
                         children: [
-                          _buildStatCard(
-                            context,
-                            label: 'Total Pot',
-                            value: '₱${group.totalPot.toStringAsFixed(0)}',
-                            icon: Icons.savings_outlined,
-                            color: colorScheme.primary,
-                          ),
-                          _buildStatCard(
-                            context,
-                            label: 'Members',
-                            value: '${members.length}/${group.maxMembers}',
-                            icon: Icons.group_outlined,
-                            color: members.length >= group.maxMembers
-                                ? Colors.green
-                                : colorScheme.primary,
-                          ),
-                          _buildStatCard(
-                            context,
-                            label: 'Contribution',
-                            value: '₱${group.contribution.toStringAsFixed(0)}',
-                            icon: Icons.account_balance_wallet_outlined,
-                            color: colorScheme.primary,
-                          ),
-                          _buildStatCard(
-                            context,
-                            label: 'Current Round',
-                            value: group.groupStatus == 'pending'
-                                ? 'Waiting to Start'
-                                : '$actualCurrentRound/$totalRounds',
-                            icon: Icons.timelapse_outlined,
-                            color: colorScheme.primary,
-                          ),
+                          _buildStatCard(context, label: 'Total Pot', value: '₱${group.totalPot.toStringAsFixed(0)}', icon: Icons.savings_outlined, color: colorScheme.primary),
+                          _buildStatCard(context, label: 'Members', value: '${members.length}/${group.maxMembers}', icon: Icons.group_outlined, color: isGroupFull ? Colors.green : colorScheme.primary),
+                          _buildStatCard(context, label: 'Contribution', value: '₱${group.contribution.toStringAsFixed(0)}', icon: Icons.payments_outlined, color: colorScheme.primary),
+                          _buildStatCard(context, label: 'Current Round', value: '$actualCurrentRound/$totalRounds', icon: Icons.timelapse_outlined, color: colorScheme.primary),
                         ],
                       ),
 
                       const SizedBox(height: 24),
 
-                      // Payout Information - FIXED based on rotation status
                       if (group.groupStatus == 'active') ...[
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              // All Rounds List
-                              ...rotations.map((rotation) {
-                                final isCurrent = rotation.status == 'in_progress';
-                                final isPast = rotation.status == 'completed';
-                                
-                                return Column(
-                                  children: [
-                                    if (rotation.round > 1) const Divider(height: 24),
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
-                                            color: isCurrent 
-                                                ? colorScheme.primary.withOpacity(0.1)
-                                                : Colors.grey.shade100,
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          child: Icon(
-                                            isCurrent ? Icons.payments : (isPast ? Icons.check_circle : Icons.schedule), 
-                                            color: isCurrent ? colorScheme.primary : (isPast ? Colors.green : Colors.grey.shade600)
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                isCurrent ? 'Payout Now' : (isPast ? 'Completed' : 'Upcoming Payout'),
-                                                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                'Round ${rotation.round}',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                                                ),
-                                              ),
-                                              Text(
-                                                'Recipient: ${rotation.recipientName}',
-                                                style: const TextStyle(fontSize: 13),
-                                                overflow: TextOverflow.ellipsis,
-                                                maxLines: 1,
-                                              ),
-                                              Text(
-                                                _formatDateWithYear(rotation.payoutDate),
-                                                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (isCurrent || isPast)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: (isPast ? Colors.green : colorScheme.primary).withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Text(
-                                              isPast ? 'DONE' : _getDaysUntil(rotation.payoutDate),
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: isPast ? Colors.green : colorScheme.primary,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ],
-                          ),
-                        ),
-
+                        _buildSectionHeader('Current Cycle'),
+                        _buildRotationCard(rotations, colorScheme),
                         const SizedBox(height: 24),
-
-                        // Cycle Progress - Derived from completed rounds
-                        const Text(
-                          'Cycle Progress',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade200),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              LinearProgressIndicator(
-                                value: completedRounds / totalRounds,
-                                backgroundColor: Colors.grey.shade200,
-                                valueColor: AlwaysStoppedAnimation(colorScheme.primary),
-                                minHeight: 8,
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    '$completedRounds rounds completed',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${((completedRounds / totalRounds) * 100).toStringAsFixed(0)}%',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
+                        _buildSectionHeader('Cycle Progress'),
+                        _buildProgressCard(completedRounds, totalRounds, colorScheme),
                         const SizedBox(height: 24),
                       ],
 
-                      // Pending Contributions (for current user) - Use derived round
                       if (pendingContributions.isNotEmpty) ...[
-                        const Text(
-                          'Your Pending Contributions',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 12),
-                        ...pendingContributions.map(
-                          (contribution) => _buildPendingContributionTile(
-                            context,
-                            group,
-                            contribution,
-                            rotations,
-                            groupsVm,
-                            actualCurrentRound,
+                        _buildSectionHeader('Your Contributions'),
+                        ...pendingContributions.map((c) => _buildPendingContributionTile(context, group, c, rotations, groupsVm, actualCurrentRound)),
+                      ],
+                      
+                      if (isCreator && group.groupStatus == 'pending') ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton.icon(
+                            onPressed: () => _deleteGroup(group),
+                            icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                            label: const Text('DELETE GROUP'),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red, textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
                           ),
                         ),
                       ],
@@ -925,271 +384,192 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     );
   }
 
-  Widget _buildPendingContributionTile(
-    BuildContext context,
-    PaluwaganGroup group,
-    Contribution contribution,
-    List<RoundRotation> rotations,
-    GroupsViewModel groupsVm,
-    int actualCurrentRound,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final currentRound = rotations.firstWhere(
-      (r) => r.round == contribution.round,
-      orElse: () => RoundRotation(
-        id: 0,
-        groupId: group.id,
-        round: contribution.round,
-        payoutDate: DateTime.now(),
-        recipientId: '',
-        recipientName: 'Unknown',
-        status: 'pending',
-      ),
-    );
-
-    // Find proof if exists
-    final proof = groupsVm.pendingPayments.firstWhere(
-      (p) => p.contributionId == contribution.id,
-      orElse: () => PaymentProof(
-        id: 0,
-        contributionId: 0,
-        groupId: 0,
-        senderId: '',
-        senderName: '',
-        recipientId: '',
-        recipientName: '',
-        round: 0,
-        gcashName: '',
-        gcashNumber: '',
-        transactionNo: '',
-        screenshotPath: '',
-        amount: 0,
-        status: 'none',
-        submittedAt: DateTime.now(),
-      ),
-    );
-
-    // Check if payment is available (group is active and it's the current round)
-    // OR if the previous payment was rejected
-    final isRejected = proof.status == 'rejected';
-    final isPaymentAvailable =
-        (group.groupStatus == 'active' &&
-        contribution.round == actualCurrentRound &&
-        contribution.status == 'pending') || isRejected;
-
-    // Check if payment has already been submitted and is pending
-    final isSubmitted = proof.status == 'pending';
-
+  Widget _buildStatusBanner({
+    required IconData icon,
+    required String title,
+    required String message,
+    required Color color,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isRejected
-              ? Colors.red
-              : (isPaymentAvailable ? colorScheme.primary : Colors.grey.shade300),
-          width: (isPaymentAvailable || isRejected) ? 1.5 : 1,
-        ),
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.15)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 32, color: color),
+          const SizedBox(height: 12),
+          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color)),
+          const SizedBox(height: 4),
+          Text(message, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: color.withOpacity(0.8), fontWeight: FontWeight.w500)),
+          if (actionLabel != null) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: onAction,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: Text(actionLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRotationCard(List<RoundRotation> rotations, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        children: rotations.map((r) {
+          final isCurrent = r.status == 'in_progress';
+          final isPast = r.status == 'completed';
+          final statusColor = isPast ? Colors.green : (isCurrent ? colorScheme.primary : const Color(0xFF94A3B8));
+          
+          return Column(
+            children: [
+              if (r.round > 1) const Divider(height: 20, color: Color(0xFFF1F5F9)),
+              Row(
+                children: [
+                  Container(
+                    height: 36, width: 36,
+                    decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                    child: Center(child: Text('${r.round}', style: TextStyle(fontWeight: FontWeight.w900, color: statusColor, fontSize: 14))),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(r.recipientName, style: TextStyle(fontSize: 14, fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600, color: const Color(0xFF1E293B))),
+                        Text(_formatDateWithYear(r.payoutDate), style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                  if (isCurrent || isPast)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                      child: Text(isPast ? 'DONE' : 'CURRENT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: statusColor)),
+                    ),
+                ],
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildProgressCard(int completed, int total, ColorScheme colorScheme) {
+    final ratio = total > 0 ? (completed / total) : 0.0;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('$completed of $total rounds', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+              Text('${(ratio * 100).toInt()}%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: colorScheme.primary)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(value: ratio, backgroundColor: const Color(0xFFF1F5F9), valueColor: AlwaysStoppedAnimation(colorScheme.primary), minHeight: 6),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingContributionTile(BuildContext context, PaluwaganGroup group, Contribution c, List<RoundRotation> rotations, GroupsViewModel groupsVm, int currentRound) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final rotation = rotations.firstWhere((r) => r.round == c.round, orElse: () => rotations.last);
+    final proof = groupsVm.pendingPayments.firstWhere((p) => p.contributionId == c.id, orElse: () => PaymentProof(id: 0, contributionId: 0, groupId: 0, senderId: '', senderName: '', recipientId: '', recipientName: '', round: 0, gcashName: '', gcashNumber: '', transactionNo: '', screenshotPath: '', amount: 0, status: 'none', submittedAt: DateTime.now()));
+
+    final isRejected = proof.status == 'rejected';
+    final isSubmitted = proof.status == 'pending';
+    final isAvailable = (c.round == currentRound && group.groupStatus == 'active') || isRejected;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isRejected ? Colors.red.withOpacity(0.3) : (isAvailable ? colorScheme.primary.withOpacity(0.3) : const Color(0xFFF1F5F9))),
+      ),
+      child: Column(
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isRejected
-                      ? Colors.red.shade50
-                      : (isPaymentAvailable
-                          ? colorScheme.primary.withOpacity(0.1)
-                          : Colors.grey.shade100),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  isRejected
-                      ? Icons.error_outline
-                      : (isPaymentAvailable ? Icons.payment : Icons.pending_actions),
-                  color: isRejected
-                      ? Colors.red
-                      : (isPaymentAvailable ? colorScheme.primary : Colors.grey),
-                ),
+                height: 40, width: 40,
+                decoration: BoxDecoration(color: isRejected ? Colors.red.withOpacity(0.1) : (isAvailable ? colorScheme.primary.withOpacity(0.1) : const Color(0xFFF8FAFC)), borderRadius: BorderRadius.circular(10)),
+                child: Icon(isRejected ? Icons.error_outline_rounded : Icons.payments_outlined, color: isRejected ? Colors.red : (isAvailable ? colorScheme.primary : const Color(0xFF94A3B8)), size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Round ${contribution.round} Contribution',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      'Send to: ${currentRound.recipientName}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                    Text(
-                      'Due: ${_formatDateWithYear(contribution.dueDate)}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
+                    Text('Round ${c.round} Contribution', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
+                    Text('Send to: ${rotation.recipientName}', style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '₱${contribution.amount.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+              if (isSubmitted)
+                _buildBadge('SUBMITTED', Colors.orange)
+              else if (isRejected)
+                _buildBadge('REJECTED', Colors.red)
+              else if (!isAvailable)
+                _buildBadge('LOCKED', Colors.grey)
+              else
+                SizedBox(
+                  height: 36,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GcashPaymentScreen(group: group, contribution: c, round: c.round, recipientId: rotation.recipientId, recipientName: rotation.recipientName, amount: c.amount))),
+                    style: ElevatedButton.styleFrom(backgroundColor: colorScheme.primary, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                    child: const Text('PAY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
                   ),
-                  const SizedBox(height: 4),
-                  if (isSubmitted)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Submitted',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange.shade700,
-                        ),
-                      ),
-                    )
-                  else if (isRejected)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Rejected',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.red.shade700,
-                        ),
-                      ),
-                    )
-                  else if (!isPaymentAvailable)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Not Available',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    )
-                  else
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => GcashPaymentScreen(
-                              group: group,
-                              contribution: contribution,
-                              round: contribution.round,
-                              recipientId: currentRound.recipientId,
-                              recipientName: currentRound.recipientName,
-                              amount: contribution.amount,
-                            ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(100, 36),
-                      ),
-                      child: const Text('Pay Now'),
-                    ),
-                ],
-              ),
+                ),
             ],
           ),
           if (isRejected && proof.rejectionReason != null) ...[
             const SizedBox(height: 12),
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade100),
-              ),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.red.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Rejection Reason:',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                    ),
-                  ),
-                  Text(
-                    proof.rejectionReason!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.red.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => GcashPaymentScreen(
-                              group: group,
-                              contribution: contribution,
-                              round: contribution.round,
-                              recipientId: currentRound.recipientId,
-                              recipientName: currentRound.recipientName,
-                              amount: contribution.amount,
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('RESUBMIT PAYMENT'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
+                  const Text('REASON:', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.red)),
+                  Text(proof.rejectionReason!, style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B), fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
@@ -1199,75 +579,47 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     );
   }
 
-  Widget _buildPendingVerificationTile(
-    BuildContext context,
-    PaymentProof proof,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _buildBadge(String label, Color color) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+      child: Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: color)),
+    );
+  }
+
+  Widget _buildPendingVerificationTile(BuildContext context, PaymentProof proof) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: colorScheme.primary.withOpacity(0.2))),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: colorScheme.primary.withOpacity(0.1),
-            child: Text(
-              proof.senderName[0].toUpperCase(),
-              style: TextStyle(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          _buildMemberAvatar(name: proof.senderName, userId: proof.senderId, radius: 18, fontSize: 12),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  proof.senderName,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-                Text(
-                  'Paid Round ${proof.round} - ₱${proof.amount.toStringAsFixed(0)}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
+                Text(proof.senderName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text('Round ${proof.round} • ₱${proof.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => VerifyPaymentScreen(paymentProof: proof),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: Colors.white,
+          SizedBox(
+            height: 32,
+            child: ElevatedButton(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VerifyPaymentScreen(paymentProof: proof))),
+              style: ElevatedButton.styleFrom(backgroundColor: colorScheme.primary, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              child: const Text('VERIFY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
             ),
-            child: const Text('Verify'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMembersTab(
-    BuildContext context,
-    List<GroupMember> members,
-    PaluwaganGroup group,
-  ) {
+  Widget _buildMembersTab(BuildContext context, List<GroupMember> members, PaluwaganGroup group) {
     final colorScheme = Theme.of(context).colorScheme;
     final currentUser = context.read<AuthViewModel>().currentUser;
     final groupsVm = context.watch<GroupsViewModel>();
@@ -1275,482 +627,87 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: groupsVm.streamRotations(group.id),
       builder: (context, rotationSnapshot) {
-        final rotations = rotationSnapshot.data?.map((r) => RoundRotation.fromMap(r)).toList() 
-            ?? groupsVm.roundRotations;
-
+        final rotations = rotationSnapshot.data?.map((r) => RoundRotation.fromMap(r)).toList() ?? groupsVm.roundRotations;
+        
         return StreamBuilder<List<Map<String, dynamic>>>(
           stream: groupsVm.streamContributions(group.id),
           builder: (context, contributionSnapshot) {
-            final contributions = contributionSnapshot.data?.map((c) => Contribution.fromMap(c)).toList() 
-                ?? groupsVm.currentGroupContributions;
-
-            // Sort members so the creator is always at the top
+            final contributions = contributionSnapshot.data?.map((c) => Contribution.fromMap(c)).toList() ?? groupsVm.currentGroupContributions;
+            
             final sortedMembers = List<GroupMember>.from(members);
-            sortedMembers.sort((a, b) {
-              if (a.userId == group.createdBy) return -1;
-              if (b.userId == group.createdBy) return 1;
-              return 0;
-            });
-
-            final currentRoundRecipient = rotations.firstWhere(
-              (r) => r.status == 'in_progress',
-              orElse: () => rotations.firstWhere(
-                (r) => r.round == group.currentRound,
-                orElse: () => rotations.isNotEmpty ? rotations.last : RoundRotation(
-                  id: 0,
-                  groupId: group.id,
-                  round: group.currentRound,
-                  payoutDate: DateTime.now(),
-                  recipientId: '',
-                  recipientName: '',
-                  status: 'pending',
-                ),
-              ),
-            );
+            sortedMembers.sort((a, b) => a.userId == group.createdBy ? -1 : (b.userId == group.createdBy ? 1 : 0));
 
             return ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: sortedMembers.length,
               itemBuilder: (context, index) {
                 final member = sortedMembers[index];
-                final isCurrentUser = member.userId == currentUser?.id;
+                final isMe = member.userId == currentUser?.id;
                 final isCreator = member.userId == group.createdBy;
-                final isPayoutRound =
-                    member.userId == currentRoundRecipient.recipientId &&
-                    group.groupStatus == 'active';
-
-                // DYNAMIC STATS CALCULATION
+                
                 final memberContributions = contributions.where((c) => c.userId == member.userId).toList();
                 final paidCount = memberContributions.where((c) => c.status == 'paid').length;
-                final receivedCount = rotations.where((r) => r.recipientId == member.userId && r.status == 'completed').length;
-
-                // TRUST SCORE CALCULATION
-                // Logic: (On-time payments / Total payments) * 100
-                // Late is defined as paid_at > due_date
-                double trustScore = 100.0;
-                int totalEvaluated = 0;
-                int onTimeCount = 0;
-
-                for (var c in memberContributions) {
-                  if (c.status == 'paid') {
-                    // Check if it's the recipient slot (auto-paid)
-                    final isRecipientSlot = rotations.any((r) => r.round == c.round && r.recipientId == c.userId);
-                    
-                    if (!isRecipientSlot) {
-                      totalEvaluated++;
-                      if (c.paidAt != null) {
-                        // Allow 1 hour grace period for processing
-                        final isLate = c.paidAt!.isAfter(c.dueDate.add(const Duration(hours: 1)));
-                        if (!isLate) {
-                          onTimeCount++;
-                        }
-                      }
-                    }
-                  } else if (c.status == 'pending' && c.dueDate.isBefore(DateTime.now())) {
-                    // Penalty for overdue unpaid contributions
-                    totalEvaluated++;
-                  }
-                }
-
-                if (totalEvaluated > 0) {
-                  trustScore = (onTimeCount / totalEvaluated) * 100;
-                }
-
+                
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isPayoutRound ? colorScheme.primary : Colors.grey.shade200,
-                      width: isPayoutRound ? 2 : 1,
-                    ),
-                  ),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFF1F5F9))),
                   child: Row(
                     children: [
-                      _buildMemberAvatar(
-                        name: member.userName,
-                        userId: member.userId,
-                        profilePicture: member.profilePicture,
-                        radius: 24,
-                        fontSize: 16,
-                        backgroundColor: isCurrentUser
-                            ? colorScheme.primary
-                            : isCreator 
-                                ? Colors.orange.shade100 
-                                : Colors.grey.shade300,
-                        textColor: isCurrentUser ? Colors.white : Colors.black,
-                      ),
-                      const SizedBox(width: 16),
+                      _buildMemberAvatar(name: member.userName, userId: member.userId, radius: 20, fontSize: 14, backgroundColor: isMe ? colorScheme.primary : null, textColor: isMe ? Colors.white : null),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    member.userName,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: isCurrentUser
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                  ),
-                                ),
-                                if (isCreator) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.shade100,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Text(
-                                      'Creator',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                                if (isPayoutRound) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      'Current Payout',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: colorScheme.primary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                Expanded(child: Text(member.userName, style: TextStyle(fontSize: 14, fontWeight: isMe ? FontWeight.w900 : FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                if (isCreator) Container(margin: const EdgeInsets.only(left: 6), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(6)), child: const Text('CREATOR', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.orange))),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Text(
-                                  'Paid: $paidCount  •  Received: $receivedCount',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                                const Spacer(),
-                                _buildTrustBadge(trustScore, totalEvaluated == 0),
-                              ],
-                            ),
+                            Text('Payments: $paidCount  •  Joined: ${DateFormat('MMM d').format(member.joinedAt)}', style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ),
-                      // REMOVE / LEAVE BUTTONS (Only if group not started)
-                      if (group.groupStatus == 'pending') ...[
-                        if (group.createdBy == currentUser?.id && !isCurrentUser)
-                          IconButton(
-                            icon: const Icon(Icons.person_remove_outlined, color: Colors.red, size: 20),
-                            onPressed: () async {
-                              final confirmed = await _showConfirmDialog(
-                                context,
-                                'Remove Member',
-                                'Are you sure you want to remove ${member.userName} from the group?',
-                              );
-                              if (confirmed) {
-                                await groupsVm.leaveGroup(group.id, member.userId);
-                              }
-                            },
-                          ),
-                        if (isCurrentUser && group.createdBy != currentUser?.id)
-                          TextButton(
-                            onPressed: () async {
-                              final confirmed = await _showConfirmDialog(
-                                context,
-                                'Leave Group',
-                                'Are you sure you want to leave ${group.name}?',
-                              );
-                              if (confirmed) {
-                                final success = await groupsVm.leaveGroup(group.id, currentUser!.id);
-                                if (success && mounted) {
-                                  Navigator.of(context).pop(); // Go back home
-                                }
-                              }
-                            },
-                            child: const Text('LEAVE', style: TextStyle(color: Colors.red, fontSize: 12)),
-                          ),
-                      ],
                     ],
                   ),
                 );
               },
             );
-          }
+          },
         );
-      }
+      },
     );
   }
 
-  Widget _buildTrustBadge(double score, bool isNew) {
-    if (isNew) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          'NEW',
-          style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
-        ),
-      );
-    }
-
-    Color badgeColor = Colors.green;
-    if (score < 70) badgeColor = Colors.red;
-    else if (score < 90) badgeColor = Colors.orange;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.verified_user, size: 10, color: badgeColor),
-          const SizedBox(width: 4),
-          Text(
-            '${score.toStringAsFixed(0)}% Trust',
-            style: TextStyle(fontSize: 10, color: badgeColor, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<bool> _showConfirmDialog(BuildContext context, String title, String content) async {
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(content),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true), 
-            child: Text(title.split(' ')[0].toUpperCase(), style: const TextStyle(color: Colors.red))
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
-
-  Widget _buildScheduleTab(
-    BuildContext context,
-    PaluwaganGroup group,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildScheduleTab(BuildContext context, PaluwaganGroup group) {
     final groupsVm = context.watch<GroupsViewModel>();
-    final currentUser = context.read<AuthViewModel>().currentUser;
-
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: groupsVm.streamRotations(group.id),
-      builder: (context, rotationSnapshot) {
-        final rotations = rotationSnapshot.data
-                ?.map((r) => RoundRotation.fromMap(r))
-                .toList() ??
-            groupsVm.roundRotations;
+      builder: (context, snapshot) {
+        final rotations = snapshot.data?.map((r) => RoundRotation.fromMap(r)).toList() ?? groupsVm.roundRotations;
+        if (rotations.isEmpty) return _buildEmptyTab(Icons.calendar_today_rounded, 'No schedule yet', 'Wait for the group to start.');
+        
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: rotations.length,
+          itemBuilder: (context, index) {
+            final r = rotations[index];
+            final isPast = r.status == 'completed';
+            final isCurrent = r.status == 'in_progress';
+            final statusColor = isPast ? Colors.green : (isCurrent ? Theme.of(context).colorScheme.primary : const Color(0xFF94A3B8));
 
-        if (rotations.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.schedule, size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 16),
-                const Text('Group not started yet', style: TextStyle(fontSize: 16, color: Colors.grey)),
-              ],
-            ),
-          );
-        }
-
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: groupsVm.streamContributions(group.id),
-          builder: (context, contributionSnapshot) {
-            final contributions = contributionSnapshot.data
-                    ?.map((c) => Contribution.fromMap(c))
-                    .toList() ??
-                groupsVm.currentGroupContributions;
-
-            return StreamBuilder<List<Map<String, dynamic>>>(
-              stream: groupsVm.streamPaymentProofs(group.id),
-              builder: (context, proofSnapshot) {
-                final allProofs = proofSnapshot.data
-                        ?.map((p) => PaymentProof.fromMap(p))
-                        .toList() ??
-                    groupsVm.pendingPayments;
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: rotations.length,
-                  itemBuilder: (context, index) {
-                    final rotation = rotations[index];
-                    final isCurrent = rotation.status == 'in_progress';
-                    final isCompleted = rotation.status == 'completed';
-                    final isFuture = rotation.status == 'pending';
-
-                    Color statusColor = isCompleted ? Colors.green : (isCurrent ? colorScheme.primary : Colors.grey);
-
-                    // Filter contributions for THIS specific round
-                    final roundContributions = contributions.where((c) => c.round == rotation.round).toList();
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      elevation: isCurrent ? 2 : 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: isCurrent ? colorScheme.primary : Colors.grey.shade200),
-                      ),
-                      child: ExpansionTile(
-                        initiallyExpanded: isCurrent,
-                        shape: const Border(), // Remove default borders
-                        leading: CircleAvatar(
-                          backgroundColor: statusColor.withOpacity(0.1),
-                          child: Text('${rotation.round}', style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
-                        ),
-                        title: Text('Round ${rotation.round}', style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
-                        subtitle: Text('Recipient: ${rotation.recipientName}', style: const TextStyle(fontSize: 13)),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                          child: Text(rotation.status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor)),
-                        ),
-                        children: [
-                          const Divider(height: 1),
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text('Payout Date:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                    Text(_formatDateWithYear(rotation.payoutDate), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                const Text('Round Contributions:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 8),
-                                ...roundContributions.map((contribution) {
-                                  final isUserSlot = contribution.userId == currentUser?.id;
-                                  final isRecipientSlot = contribution.userId == rotation.recipientId;
-                                  final proof = allProofs.firstWhere(
-                                    (p) => p.contributionId == contribution.id,
-                                    orElse: () => PaymentProof(id: 0, contributionId: 0, groupId: 0, senderId: '', senderName: '', recipientId: '', recipientName: '', round: 0, gcashName: '', gcashNumber: '', transactionNo: '', screenshotPath: '', amount: 0, status: 'none', submittedAt: DateTime.now()),
-                                  );
-
-                                  // Check if current user is the recipient of THIS round
-                                  final isUserTheRecipient = rotation.recipientId == currentUser?.id;
-                                  
-                                  final canPay = isUserSlot && !isRecipientSlot && isCurrent && contribution.status == 'pending' && (proof.status == 'none' || proof.status == 'rejected');
-                                  final canVerify = isUserTheRecipient && isCurrent && proof.status == 'pending';
-
-                                  Color cStatusColor;
-                                  String cStatusText;
-
-                                  if (contribution.status == 'paid') {
-                                    cStatusColor = Colors.green;
-                                    cStatusText = isRecipientSlot ? "Recipient (Skipped)" : "Paid";
-                                  } else if (proof.status == 'pending') {
-                                    cStatusColor = Colors.orange;
-                                    cStatusText = "Pending";
-                                  } else if (proof.status == 'rejected') {
-                                    cStatusColor = Colors.red;
-                                    cStatusText = "Rejected";
-                                  } else {
-                                    cStatusColor = Colors.red;
-                                    cStatusText = "Unpaid";
-                                  }
-
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: proof.status == 'rejected' ? Colors.red.withOpacity(0.05) : Colors.grey.shade50, 
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: proof.status == 'rejected' ? Border.all(color: Colors.red.withOpacity(0.2)) : null,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(isUserSlot ? "You" : "Member ${contribution.userId.substring(0, 5)}", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                                              Text('₱${contribution.amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                            ],
-                                          ),
-                                        ),
-                                        if (proof.status != 'none')
-                                          IconButton(
-                                            onPressed: () => _showReceiptImage(context, proof),
-                                            icon: Icon(
-                                              Icons.receipt_long, 
-                                              size: 18, 
-                                              color: proof.status == 'rejected' ? Colors.red : Colors.blue
-                                            ),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                          ),
-                                        const SizedBox(width: 8),
-                                        if (canPay)
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => GcashPaymentScreen(group: group, contribution: contribution, round: contribution.round, recipientId: rotation.recipientId, recipientName: rotation.recipientName, amount: contribution.amount)));
-                                            },
-                                            child: Text(
-                                              proof.status == 'rejected' ? 'RE-PAY' : 'PAY', 
-                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)
-                                            ),
-                                          )
-                                        else if (canVerify)
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => VerifyPaymentScreen(paymentProof: proof)));
-                                            },
-                                            child: const Text('VERIFY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
-                                          )
-                                        else
-                                          Text(cStatusText, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: cStatusColor)),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: isCurrent ? statusColor.withOpacity(0.3) : const Color(0xFFF1F5F9))),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                leading: CircleAvatar(backgroundColor: statusColor.withOpacity(0.1), child: Text('${r.round}', style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 14))),
+                title: Text(r.recipientName, style: TextStyle(fontSize: 14, fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600)),
+                subtitle: Text(_formatDateWithYear(r.payoutDate), style: const TextStyle(fontSize: 11)),
+                trailing: Text(r.status.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: statusColor)),
+              ),
             );
           },
         );
@@ -1758,333 +715,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     );
   }
 
-  Widget _buildPaymentTab(
-    BuildContext context,
-    PaluwaganGroup group,
-  ) {
-    final currentUser = context.read<AuthViewModel>().currentUser;
-    final colorScheme = Theme.of(context).colorScheme;
-    final groupsVm = context.watch<GroupsViewModel>();
-
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: groupsVm.streamContributions(group.id),
-      builder: (context, contributionSnapshot) {
-        final contributions = contributionSnapshot.data
-                ?.map((c) => Contribution.fromMap(c))
-                .toList() ??
-            groupsVm.currentGroupContributions;
-
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: groupsVm.streamRotations(group.id),
-          builder: (context, rotationSnapshot) {
-            final rotations = rotationSnapshot.data
-                    ?.map((r) => RoundRotation.fromMap(r))
-                    .toList() ??
-                groupsVm.roundRotations;
-
-            return StreamBuilder<List<Map<String, dynamic>>>(
-              stream: groupsVm.streamPaymentProofs(group.id),
-              builder: (context, proofSnapshot) {
-                final allProofs = proofSnapshot.data
-                        ?.map((p) => PaymentProof.fromMap(p))
-                        .toList() ??
-                    groupsVm.pendingPayments;
-
-                // EVERYONE sees all contributions for the round
-                // We filter for the current round to keep it clean
-                final currentRoundContributions = contributions
-                    .where((c) => c.round == group.currentRound)
-                    .toList();
-
-                // Check if current user is the recipient of THIS round
-                final currentRotation = rotations.firstWhere(
-                  (r) => r.round == group.currentRound,
-                  orElse: () => RoundRotation(id: 0, groupId: 0, round: 0, payoutDate: DateTime.now(), recipientId: '', recipientName: '', status: ''),
-                );
-                final isCurrentRecipient = currentRotation.recipientId == currentUser?.id;
-
-                if (currentRoundContributions.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.check_circle, size: 64, color: Colors.green.shade400),
-                        const SizedBox(height: 16),
-                        const Text('No payments found for this round', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                      ],
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    if (isCurrentRecipient)
-                      Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.all(16),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.star, color: Colors.green),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Text(
-                                "It's your turn! You are the recipient this round. Please verify incoming payments below.",
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: currentRoundContributions.length,
-                        itemBuilder: (context, index) {
-                          final contribution = currentRoundContributions[index];
-                          final isUserContribution = contribution.userId == currentUser?.id;
-                          final isRecipientOfThisSlot = contribution.userId == currentRotation.recipientId;
-
-                          // Find proof if exists
-                          final proof = allProofs.firstWhere(
-                            (p) => p.contributionId == contribution.id,
-                            orElse: () => PaymentProof(id: 0, contributionId: 0, groupId: 0, senderId: '', senderName: '', recipientId: '', recipientName: '', round: 0, gcashName: '', gcashNumber: '', transactionNo: '', screenshotPath: '', amount: 0, status: 'none', submittedAt: DateTime.now()),
-                          );
-
-                          // Logic for buttons
-                          final canPay = isUserContribution && !isRecipientOfThisSlot && contribution.status == 'pending' && proof.status == 'none';
-                          final canVerify = isCurrentRecipient && proof.status == 'pending';
-
-                          Color statusColor;
-                          String statusText;
-                          if (contribution.status == 'paid') {
-                            statusText = isRecipientOfThisSlot ? 'Recipient (Skipped)' : 'Verified & Paid';
-                            statusColor = Colors.green;
-                          } else if (proof.status == 'pending') {
-                            statusText = 'Pending Verification';
-                            statusColor = Colors.orange;
-                          } else {
-                            statusText = 'Unpaid';
-                            statusColor = Colors.red;
-                          }
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: isUserContribution ? colorScheme.primary : Colors.grey.shade300, width: isUserContribution ? 1.5 : 1),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      isUserContribution ? "Your Contribution" : contribution.userId.substring(0, 8),
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                                      child: Text(statusText, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor)),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('₱${contribution.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                                    Row(
-                                      children: [
-                                        if (proof.status == 'pending' || proof.status == 'rejected')
-                                          IconButton(
-                                            onPressed: () => _showReceiptImage(context, proof),
-                                            icon: Icon(
-                                              Icons.receipt_long, 
-                                              color: proof.status == 'rejected' ? Colors.red : Colors.blue
-                                            ),
-                                            tooltip: 'View Screenshot',
-                                          ),
-                                        if (canPay)
-                                          ElevatedButton(
-                                            onPressed: () {
-                                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => GcashPaymentScreen(group: group, contribution: contribution, round: contribution.round, recipientId: currentRotation.recipientId, recipientName: currentRotation.recipientName, amount: contribution.amount)));
-                                            },
-                                            style: ElevatedButton.styleFrom(backgroundColor: colorScheme.primary, foregroundColor: Colors.white),
-                                            child: Text(proof.status == 'rejected' ? 'Re-Pay' : 'Pay Now'),
-                                          ),
-                                        if (canVerify)
-                                          ElevatedButton(
-                                            onPressed: () {
-                                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => VerifyPaymentScreen(paymentProof: proof)));
-                                            },
-                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                                            child: const Text('Verify'),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showReceiptImage(BuildContext context, PaymentProof proof) {
-    final String path = proof.screenshotPath;
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppBar(
-              title: const Text('Receipt Screenshot', style: TextStyle(fontSize: 16)),
-              automaticallyImplyLeading: false,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              actions: [
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-              ],
-            ),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.7,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: path.startsWith('http')
-                          ? Image.network(
-                              path,
-                              fit: BoxFit.contain,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return const Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(20.0),
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                                      SizedBox(height: 12),
-                                      Text('Failed to load receipt from cloud'),
-                                    ],
-                                  ),
-                                );
-                              },
-                            )
-                          : Image.file(
-                              File(path),
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.no_photography, size: 64, color: Colors.grey),
-                                      SizedBox(height: 12),
-                                      const Text(
-                                        'Receipt not found on this device',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                    if (proof.status == 'rejected' && proof.rejectionReason != null) ...[
-                      const Divider(),
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.cancel, color: Colors.red, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'PAYMENT REJECTED',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Reason:',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              proof.rejectionReason!,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChatTab(
-    BuildContext context,
-    User currentUser,
-    bool isGroupCompleted,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildChatTab(BuildContext context, User currentUser, bool isGroupCompleted) {
     final groupsVm = context.read<GroupsViewModel>();
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       children: [
@@ -2092,295 +725,202 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           child: StreamBuilder<List<Map<String, dynamic>>>(
             stream: groupsVm.streamChat(widget.groupId),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final messages = snapshot.data
-                      ?.map((m) => GroupChat.fromMap(m))
-                      .toList() ??
-                  [];
-
-              // Sort messages by timestamp to ensure correct order
+              final messages = snapshot.data?.map((m) => GroupChat.fromMap(m)).toList() ?? [];
               messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-              if (messages.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey.shade400),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No messages yet',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Be the first to start the conversation!',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              // Auto-scroll to bottom on new message
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (_chatScrollController.hasClients) {
-                  _chatScrollController.animateTo(
-                    _chatScrollController.position.maxScrollExtent,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                  );
-                }
-              });
+              if (messages.isEmpty) return _buildEmptyTab(Icons.chat_bubble_outline_rounded, 'No messages', 'Start the conversation!');
 
               return ListView.builder(
                 controller: _chatScrollController,
                 padding: const EdgeInsets.all(16),
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
-                  final message = messages[index];
-                  final isMe = message.userId == currentUser.id;
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisAlignment: isMe
-                          ? MainAxisAlignment.end
-                          : MainAxisAlignment.start,
-                      children: [
-                        if (!isMe) ...[
-                          _buildMemberAvatar(
-                            name: message.userName,
-                            userId: message.userId,
-                            profilePicture: message.profilePicture,
-                            radius: 18,
-                            fontSize: 12,
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isMe
-                                  ? colorScheme.primary
-                                  : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(16).copyWith(
-                                bottomLeft: isMe
-                                    ? const Radius.circular(16)
-                                    : const Radius.circular(4),
-                                bottomRight: isMe
-                                    ? const Radius.circular(4)
-                                    : const Radius.circular(16),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (!isMe)
-                                  Text(
-                                    message.userName,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
-                                    ),
-                                  ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  message.message,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isMe ? Colors.white : Colors.black87,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _formatTime(message.timestamp),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: isMe
-                                        ? Colors.white.withOpacity(0.7)
-                                        : Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (isMe) ...[
-                          const SizedBox(width: 8),
-                          _buildMemberAvatar(
-                            name: currentUser.fullName,
-                            userId: currentUser.id,
-                            profilePicture: currentUser.profilePicture,
-                            radius: 18,
-                            fontSize: 12,
-                            backgroundColor: colorScheme.primary,
-                            textColor: Colors.white,
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
+                  final msg = messages[index];
+                  final isMe = msg.userId == currentUser.id;
+                  return _buildChatBubble(msg, isMe, colorScheme);
                 },
               );
             },
           ),
         ),
-
-        // Message Input
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _chatController,
-                  decoration: InputDecoration(
-                    hintText: 'Type a message...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                  ),
-                  onSubmitted: (_) => _sendMessage(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FloatingActionButton(
-                onPressed: _sendMessage,
-                mini: true,
-                backgroundColor: colorScheme.primary,
-                child: const Icon(Icons.send, color: Colors.white),
-              ),
-            ],
-          ),
-        ),
+        _buildChatInput(colorScheme),
       ],
     );
   }
 
-  Widget _buildStatCard(
-    BuildContext context, {
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  Widget _buildChatBubble(GroupChat msg, bool isMe, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) _buildMemberAvatar(name: msg.userName, userId: msg.userId, radius: 14, fontSize: 10),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isMe ? colorScheme.primary : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(14).copyWith(
+                  bottomLeft: isMe ? const Radius.circular(14) : const Radius.circular(2),
+                  bottomRight: isMe ? const Radius.circular(2) : const Radius.circular(14),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!isMe) Text(msg.userName, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: colorScheme.primary)),
+                  Text(msg.message, style: TextStyle(fontSize: 13, color: isMe ? Colors.white : const Color(0xFF1E293B))),
+                  const SizedBox(height: 2),
+                  Text(_formatTime(msg.timestamp), style: TextStyle(fontSize: 8, color: isMe ? Colors.white70 : Colors.grey)),
+                ],
+              ),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildChatInput(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFF1F5F9)))),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _chatController,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Message...',
+                hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
+                filled: true, fillColor: const Color(0xFFF8FAFC),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+              ),
+              onSubmitted: (_) => _sendMessage(),
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(onPressed: _sendMessage, icon: const Icon(Icons.send_rounded), color: colorScheme.primary, padding: EdgeInsets.zero),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyTab(IconData icon, String title, String subtitle) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 48, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
+          Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF64748B))),
+          Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startGroup(PaluwaganGroup group) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Start Association?', style: TextStyle(fontWeight: FontWeight.w900)),
+        content: const Text('This will begin the savings cycle and randomize the rotation order.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w800))),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('START NOW', style: TextStyle(fontWeight: FontWeight.w800))),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      final success = await context.read<GroupsViewModel>().startGroup(group.id);
+      if (success && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cycle started!'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating));
+    }
+  }
+
+  Future<void> _deleteGroup(PaluwaganGroup group) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Group?', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.red)),
+        content: const Text('This action is permanent. All group data will be lost.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w800))),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('DELETE', style: TextStyle(fontWeight: FontWeight.w800))),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      final success = await context.read<GroupsViewModel>().deleteGroup(group.id);
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Group deleted.'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
+        Navigator.pop(context);
+      }
+    }
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 10),
+      child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF1E293B), letterSpacing: -0.2)),
+    );
+  }
+
+  Widget _buildStatCard(BuildContext context, {required String label, required String value, required IconData icon, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFF1F5F9))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 16),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 6),
+              Expanded(child: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)), maxLines: 1, overflow: TextOverflow.ellipsis)),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
+          const SizedBox(height: 6),
+          Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)), overflow: TextOverflow.ellipsis, maxLines: 1),
         ],
       ),
     );
   }
 
-  String _formatDateShort(DateTime date) {
-    return '${date.month}/${date.day}';
+  Widget _buildMemberAvatar({required String name, required String userId, String? profilePicture, double radius = 24, double fontSize = 16, Color? backgroundColor, Color? textColor}) {
+    final groupsVm = context.read<GroupsViewModel>();
+    final imageUrl = profilePicture ?? groupsVm.profileCache[userId];
+    return CircleAvatar(
+      radius: radius, backgroundColor: backgroundColor ?? const Color(0xFFEEF2FF),
+      backgroundImage: imageUrl != null ? (imageUrl.startsWith('http') ? NetworkImage(imageUrl) as ImageProvider : FileImage(File(imageUrl))) : null,
+      child: imageUrl == null ? Text(_getInitials(name), style: TextStyle(fontSize: fontSize, color: textColor ?? Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w900)) : null,
+    );
   }
 
-  String _formatDateWithYear(DateTime date) {
-    return '${_getMonthName(date.month)} ${date.day}, ${date.year}';
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
-  String _getMonthName(int month) {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return months[month - 1];
-  }
-
-  String _formatTime(DateTime date) {
-    return '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
+  String _formatDateWithYear(DateTime date) => DateFormat('MMM d, yyyy').format(date);
+  String _formatTime(DateTime date) => DateFormat('h:mm a').format(date);
   String _getDaysUntil(DateTime date) {
     final days = date.difference(DateTime.now()).inDays;
     if (days < 0) return 'Overdue';
     if (days == 0) return 'Today';
-    if (days == 1) return 'Tomorrow';
     return '$days days left';
   }
 }

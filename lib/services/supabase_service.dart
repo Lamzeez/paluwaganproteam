@@ -125,6 +125,14 @@ class SupabaseService {
     await _supabase.from('group_members').insert(memberData);
   }
 
+  Future<List<Map<String, dynamic>>> getMembers(int groupId) async {
+    final response = await _supabase
+        .from('group_members')
+        .select()
+        .eq('group_id', groupId);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
   Future<void> removeMember(int groupId, String userId) async {
     await _supabase
         .from('group_members')
